@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
 
-function generateCode(prefix, num) {
-  return `${prefix}-${String(num).padStart(3, '0')}`
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const part = (len) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return `${part(4)}-${part(4)}`
 }
 
 export default function AdminClients() {
   const [clients, setClients] = useState([])
   const [sellers, setSellers] = useState([])
   const [form, setForm] = useState({ name: '', phone: '', seller_id: '' })
-  const [bulk, setBulk] = useState({ count: 10, prefix: 'CLI', seller_id: '' })
+  const [bulk, setBulk] = useState({ count: 10, seller_id: '' })
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
-  const [tab, setTab] = useState('list') // list | add | bulk
+  const [tab, setTab] = useState('list')
 
   useEffect(() => { loadAll() }, [])
 
@@ -29,8 +31,7 @@ export default function AdminClients() {
     e.preventDefault()
     setLoading(true)
     setMsg('')
-    // Auto-generate code
-    const code = generateCode('CLI', clients.length + 1)
+    const code = generateCode()
     const { error } = await supabase.from('clients').insert({
       name: form.name.trim(),
       phone: form.phone.trim() || null,
@@ -49,7 +50,7 @@ export default function AdminClients() {
     const start = clients.length + 1
     const rows = Array.from({ length: parseInt(bulk.count) }, (_, i) => ({
       name: `Cliente ${start + i}`,
-      code: generateCode(bulk.prefix, start + i),
+      code: generateCode(),
       seller_id: bulk.seller_id || null,
     }))
     const { error } = await supabase.from('clients').insert(rows)
@@ -90,11 +91,10 @@ export default function AdminClients() {
         <p style={{ color: msg.includes('Error') ? '#ef4444' : '#22c55e', fontSize: '13px' }}>{msg}</p>
       </div>}
 
-      {/* LIST */}
       {tab === 'list' && (
         <div className="card">
           {clients.length === 0 ? (
-            <p style={{ color: '#8899bb' }}>No hay clientes aún. Agrega o genera en masa.</p>
+            <p style={{ color: '#8899bb' }}>No hay clientes aún.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -126,7 +126,6 @@ export default function AdminClients() {
         </div>
       )}
 
-      {/* ADD ONE */}
       {tab === 'add' && (
         <div className="card" style={{ maxWidth: '480px' }}>
           <form onSubmit={addClient}>
@@ -156,11 +155,10 @@ export default function AdminClients() {
         </div>
       )}
 
-      {/* BULK */}
       {tab === 'bulk' && (
         <div className="card" style={{ maxWidth: '480px' }}>
           <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '20px' }}>
-            Genera múltiples clientes con códigos automáticos listos para enviar por WhatsApp.
+            Genera múltiples clientes con códigos aleatorios listos para enviar por WhatsApp.
           </p>
           <form onSubmit={addBulk}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -168,11 +166,6 @@ export default function AdminClients() {
                 <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Cantidad</label>
                 <input type="number" min="1" max="100" value={bulk.count}
                   onChange={e => setBulk(b => ({ ...b, count: e.target.value }))} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Prefijo de código</label>
-                <input value={bulk.prefix} onChange={e => setBulk(b => ({ ...b, prefix: e.target.value.toUpperCase() }))}
-                  placeholder="CLI" maxLength={5} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Vendedor asignado</label>
