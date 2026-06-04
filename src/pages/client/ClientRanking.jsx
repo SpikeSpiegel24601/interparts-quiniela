@@ -1,6 +1,38 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
-import { getPrize, PRIZES } from '../../lib/helpers.js'
+
+const LEGENDS = [
+  { name: 'El Kaiser', emoji: '👑' },
+  { name: 'La Pulga', emoji: '⚡' },
+  { name: 'El Fenómeno', emoji: '🔥' },
+  { name: 'El Pibe', emoji: '🎨' },
+  { name: 'La Joya', emoji: '💎' },
+  { name: 'El Toro', emoji: '🐂' },
+  { name: 'El Buitre', emoji: '🦅' },
+  { name: 'El Matador', emoji: '⚔️' },
+  { name: 'La Araña', emoji: '🕷️' },
+  { name: 'El Mago', emoji: '🪄' },
+  { name: 'El Escorpión', emoji: '🦂' },
+  { name: 'El Halcón', emoji: '🦅' },
+  { name: 'El Pistolero', emoji: '🎯' },
+  { name: 'La Bestia', emoji: '💪' },
+  { name: 'El Cañón', emoji: '💥' },
+  { name: 'El Tigre', emoji: '🐯' },
+  { name: 'La Máquina', emoji: '⚙️' },
+  { name: 'El Monstruo', emoji: '👹' },
+  { name: 'El Cohete', emoji: '🚀' },
+  { name: 'La Cobra', emoji: '🐍' },
+  { name: 'El Gladiador', emoji: '🛡️' },
+  { name: 'La Pantera', emoji: '🐆' },
+  { name: 'El Gigante', emoji: '🗿' },
+  { name: 'La Flecha', emoji: '🏹' },
+  { name: 'El Volcán', emoji: '🌋' },
+  { name: 'El Trueno', emoji: '⛈️' },
+  { name: 'La Leyenda', emoji: '🏆' },
+  { name: 'El Coloso', emoji: '🗽' },
+  { name: 'El Rayo', emoji: '⚡' },
+  { name: 'El Ciclón', emoji: '🌪️' },
+]
 
 export default function ClientRanking() {
   const [client] = useState(() => JSON.parse(localStorage.getItem('client') || '{}'))
@@ -13,19 +45,21 @@ export default function ClientRanking() {
     const { data } = await supabase
       .from('clients')
       .select('id, name, picks(is_correct)')
-
     const board = (data || []).map(c => ({
       ...c,
       points: c.picks?.filter(p => p.is_correct).length || 0,
       total: c.picks?.length || 0,
     })).sort((a, b) => b.points - a.points || b.total - a.total)
-
     setLeaderboard(board)
     setLoading(false)
   }
 
-  const myPos = leaderboard.findIndex(c => c.id === client.id) + 1
-  const myData = leaderboard.find(c => c.id === client.id)
+  const myPos = leaderboard.findIndex(c => c.id === client.id)
+  const myData = leaderboard[myPos]
+
+  function getLegend(index) {
+    return LEGENDS[index % LEGENDS.length]
+  }
 
   return (
     <div>
@@ -34,7 +68,6 @@ export default function ClientRanking() {
         {leaderboard.length} participantes · Actualizado en tiempo real
       </p>
 
-      {/* My position */}
       {myData && (
         <div className="card" style={{
           marginBottom: '24px', borderColor: '#e8281e',
@@ -44,9 +77,14 @@ export default function ClientRanking() {
             <div>
               <div style={{ fontSize: '12px', color: '#8899bb', marginBottom: '4px' }}>TU POSICIÓN</div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: '48px', color: '#e8281e', lineHeight: 1 }}>
-                #{myPos}
+                #{myPos + 1}
               </div>
               <div style={{ color: '#8899bb', fontSize: '13px' }}>de {leaderboard.length} participantes</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '36px' }}>{getLegend(myPos).emoji}</div>
+              <div style={{ fontSize: '13px', color: '#f0f4ff', fontWeight: 600 }}>{getLegend(myPos).name}</div>
+              <div style={{ fontSize: '11px', color: '#8899bb' }}>tu apodo</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: '48px', color: '#ffd700', lineHeight: 1 }}>
@@ -58,45 +96,16 @@ export default function ClientRanking() {
         </div>
       )}
 
-      {/* Prize tiers */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>PREMIOS</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {PRIZES.map(p => {
-            const myPoints = myData?.points || 0
-            const achieved = myPoints >= p.min
-            return (
-              <div key={p.min} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '10px 14px', borderRadius: '8px',
-                background: achieved ? p.color + '22' : '#0a0f1e',
-                border: `1px solid ${achieved ? p.color : '#2a3a55'}`
-              }}>
-                <span style={{ fontSize: '15px' }}>{p.emoji} {p.label}</span>
-                <span style={{
-                  fontSize: '13px', fontWeight: 700,
-                  color: achieved ? p.color : '#4a5a7a'
-                }}>
-                  {p.max === 999 ? `${p.min}+` : `${p.min}–${p.max}`} pts
-                  {achieved && ' ✓'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Leaderboard */}
       <div className="card">
+        <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>RANKING GENERAL</h3>
         {loading ? (
           <p style={{ color: '#8899bb' }}>Cargando ranking...</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {leaderboard.map((c, i) => {
               const isMe = c.id === client.id
-              const prize = getPrize(c.points)
+              const legend = getLegend(i)
               const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
-
               return (
                 <div key={c.id} style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
@@ -104,22 +113,22 @@ export default function ClientRanking() {
                   background: isMe ? '#e8281e22' : '#0a0f1e',
                   border: `1px solid ${isMe ? '#e8281e' : '#2a3a55'}`
                 }}>
-                  <div style={{
-                    width: '32px', textAlign: 'center',
+                  <div style={{ width: '32px', textAlign: 'center',
                     fontFamily: 'Bebas Neue', fontSize: '20px',
-                    color: i < 3 ? '#ffd700' : '#4a5a7a'
-                  }}>
+                    color: i < 3 ? '#ffd700' : '#4a5a7a' }}>
                     {medal || (i + 1)}
                   </div>
+                  <div style={{ fontSize: '24px' }}>{legend.emoji}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: isMe ? 700 : 500, fontSize: '14px' }}>
-                      {c.name} {isMe && <span style={{ color: '#e8281e', fontSize: '11px' }}>(tú)</span>}
+                      {legend.name}
+                      {isMe && <span style={{ color: '#e8281e', fontSize: '11px', marginLeft: '8px' }}>← eres tú</span>}
                     </div>
-                    {prize && <div style={{ fontSize: '11px', color: prize.color }}>{prize.emoji} {prize.label}</div>}
+                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>{c.total} picks realizados</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontFamily: 'Bebas Neue', fontSize: '24px', color: '#ffd700' }}>{c.points}</div>
-                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>{c.total} picks</div>
+                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>pts</div>
                   </div>
                 </div>
               )
