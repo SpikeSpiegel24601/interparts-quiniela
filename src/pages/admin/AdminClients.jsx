@@ -7,14 +7,17 @@ function generateCode() {
   return `${part(4)}-${part(4)}`
 }
 
+const EMPTY_FORM = { name: '', phone: '', seller_id: '', contpaq_id: '' }
+
 export default function AdminClients() {
   const [clients, setClients] = useState([])
   const [sellers, setSellers] = useState([])
-  const [form, setForm] = useState({ name: '', phone: '', seller_id: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
   const [bulk, setBulk] = useState({ count: 10, seller_id: '' })
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState('list')
+  const [editing, setEditing] = useState(null)
 
   useEffect(() => { loadAll() }, [])
 
@@ -36,11 +39,40 @@ export default function AdminClients() {
       name: form.name.trim(),
       phone: form.phone.trim() || null,
       seller_id: form.seller_id || null,
+      contpaq_id: form.contpaq_id.trim() || null,
       code
     })
     if (error) setMsg('Error: ' + error.message)
-    else { setMsg(`✅ Cliente agregado. Código: ${code}`); setForm({ name: '', phone: '', seller_id: '' }); loadAll() }
+    else { setMsg(`✅ Cliente agregado. Código: ${code}`); setForm(EMPTY_FORM); loadAll() }
     setLoading(false)
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    setLoading(true)
+    setMsg('')
+    const { error } = await supabase.from('clients').update({
+      name: form.name.trim(),
+      phone: form.phone.trim() || null,
+      seller_id: form.seller_id || null,
+      contpaq_id: form.contpaq_id.trim() || null,
+      code: form.code.trim().toUpperCase(),
+    }).eq('id', editing)
+    if (error) setMsg('Error: ' + error.message)
+    else { setMsg('✅ Cliente actualizado'); setEditing(null); setForm(EMPTY_FORM); loadAll(); setTab('list') }
+    setLoading(false)
+  }
+
+  function startEdit(c) {
+    setEditing(c.id)
+    setForm({
+      name: c.name,
+      phone: c.phone || '',
+      seller_id: c.seller_id || '',
+      contpaq_id: c.contpaq_id || '',
+      code: c.code,
+    })
+    setTab('edit')
   }
 
   async function addBulk(e) {
@@ -66,8 +98,8 @@ export default function AdminClients() {
   }
 
   const tabBtn = (key, label) => (
-    <button onClick={() => setTab(key)} className="btn"
-      style={{
+    <button onClick={() => { setTab(key); if (key !== 'edit') { setEditing(null); setForm(EMPTY_FORM) } }}
+      className="btn" style={{
         padding: '8px 20px', fontSize: '13px',
         background: tab === key ? '#e8281e' : 'transparent',
         color: tab === key ? 'white' : '#8899bb',
@@ -76,21 +108,27 @@ export default function AdminClients() {
       }}>{label}</button>
   )
 
+  const fieldStyle = { fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }
+
   return (
     <div>
       <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>CLIENTES</h1>
       <p style={{ color: '#8899bb', marginBottom: '24px' }}>Gestiona los clientes participantes</p>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
         {tabBtn('list', `📋 Lista (${clients.length})`)}
         {tabBtn('add', '➕ Agregar uno')}
         {tabBtn('bulk', '⚡ Generar masivo')}
+        {editing && tabBtn('edit', '✏️ Editando...')}
       </div>
 
-      {msg && <div className="card" style={{ marginBottom: '16px', borderColor: msg.includes('Error') ? '#ef4444' : '#22c55e' }}>
-        <p style={{ color: msg.includes('Error') ? '#ef4444' : '#22c55e', fontSize: '13px' }}>{msg}</p>
-      </div>}
+      {msg && (
+        <div className="card" style={{ marginBottom: '16px', borderColor: msg.includes('Error') ? '#ef4444' : '#22c55e' }}>
+          <p style={{ color: msg.includes('Error') ? '#ef4444' : '#22c55e', fontSize: '13px' }}>{msg}</p>
+        </div>
+      )}
 
+      {/* LIST */}
       {tab === 'list' && (
         <div className="card">
           {clients.length === 0 ? (
@@ -100,7 +138,7 @@ export default function AdminClients() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #2a3a55' }}>
-                    {['Código', 'Nombre', 'Teléfono', 'Vendedor', ''].map(h => (
+                    {['No. CONTPAQ', 'Código', 'Nombre', 'Teléfono', 'Vendedor', ''].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: 'left',
                         color: '#8899bb', fontSize: '12px', fontWeight: 600 }}>{h}</th>
                     ))}
@@ -109,13 +147,18 @@ export default function AdminClients() {
                 <tbody>
                   {clients.map(c => (
                     <tr key={c.id} style={{ borderBottom: '1px solid #1a2235' }}>
+                      <td style={{ padding: '12px', color: '#8899bb', fontFamily: 'monospace' }}>{c.contpaq_id || '—'}</td>
                       <td style={{ padding: '12px', fontFamily: 'monospace', color: '#e8281e', fontWeight: 700 }}>{c.code}</td>
                       <td style={{ padding: '12px', fontWeight: 500 }}>{c.name}</td>
                       <td style={{ padding: '12px', color: '#8899bb' }}>{c.phone || '—'}</td>
                       <td style={{ padding: '12px', color: '#8899bb' }}>{c.sellers?.name || '—'}</td>
                       <td style={{ padding: '12px' }}>
-                        <button className="btn btn-ghost" onClick={() => deleteClient(c.id)}
-                          style={{ padding: '4px 10px', fontSize: '12px', color: '#ef4444' }}>🗑️</button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-ghost" onClick={() => startEdit(c)}
+                            style={{ padding: '4px 10px', fontSize: '12px' }}>✏️</button>
+                          <button className="btn btn-ghost" onClick={() => deleteClient(c.id)}
+                            style={{ padding: '4px 10px', fontSize: '12px', color: '#ef4444' }}>🗑️</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -126,22 +169,28 @@ export default function AdminClients() {
         </div>
       )}
 
+      {/* ADD */}
       {tab === 'add' && (
         <div className="card" style={{ maxWidth: '480px' }}>
           <form onSubmit={addClient}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Nombre *</label>
+                <label style={fieldStyle}>Nombre *</label>
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Juan Pérez" required />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Teléfono</label>
+                <label style={fieldStyle}>No. Cliente CONTPAQ</label>
+                <input value={form.contpaq_id} onChange={e => setForm(f => ({ ...f, contpaq_id: e.target.value }))}
+                  placeholder="12345" />
+              </div>
+              <div>
+                <label style={fieldStyle}>Teléfono</label>
                 <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   placeholder="81 1234 5678" />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Vendedor asignado</label>
+                <label style={fieldStyle}>Vendedor asignado</label>
                 <select value={form.seller_id} onChange={e => setForm(f => ({ ...f, seller_id: e.target.value }))}>
                   <option value="">Sin asignar</option>
                   {sellers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -155,6 +204,61 @@ export default function AdminClients() {
         </div>
       )}
 
+      {/* EDIT */}
+      {tab === 'edit' && editing && (
+        <div className="card" style={{ maxWidth: '480px' }}>
+          <h3 style={{ fontSize: '20px', marginBottom: '20px' }}>Editar cliente</h3>
+          <form onSubmit={saveEdit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={fieldStyle}>Nombre *</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Juan Pérez" required />
+              </div>
+              <div>
+                <label style={fieldStyle}>No. Cliente CONTPAQ</label>
+                <input value={form.contpaq_id} onChange={e => setForm(f => ({ ...f, contpaq_id: e.target.value }))}
+                  placeholder="12345" />
+              </div>
+              <div>
+                <label style={fieldStyle}>Teléfono</label>
+                <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="81 1234 5678" />
+              </div>
+              <div>
+                <label style={fieldStyle}>Vendedor asignado</label>
+                <select value={form.seller_id} onChange={e => setForm(f => ({ ...f, seller_id: e.target.value }))}>
+                  <option value="">Sin asignar</option>
+                  {sellers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={fieldStyle}>Código de acceso</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    style={{ fontFamily: 'monospace', letterSpacing: '0.1em' }} />
+                  <button type="button" className="btn btn-ghost"
+                    onClick={() => setForm(f => ({ ...f, code: generateCode() }))}
+                    style={{ padding: '10px 14px', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                    🎲 Nuevo
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-primary" type="submit" disabled={loading} style={{ flex: 1 }}>
+                  {loading ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+                <button type="button" className="btn btn-ghost"
+                  onClick={() => { setEditing(null); setForm(EMPTY_FORM); setTab('list') }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* BULK */}
       {tab === 'bulk' && (
         <div className="card" style={{ maxWidth: '480px' }}>
           <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '20px' }}>
@@ -163,12 +267,12 @@ export default function AdminClients() {
           <form onSubmit={addBulk}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Cantidad</label>
+                <label style={fieldStyle}>Cantidad</label>
                 <input type="number" min="1" max="100" value={bulk.count}
                   onChange={e => setBulk(b => ({ ...b, count: e.target.value }))} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>Vendedor asignado</label>
+                <label style={fieldStyle}>Vendedor asignado</label>
                 <select value={bulk.seller_id} onChange={e => setBulk(b => ({ ...b, seller_id: e.target.value }))}>
                   <option value="">Sin asignar</option>
                   {sellers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
