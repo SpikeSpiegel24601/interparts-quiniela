@@ -15,13 +15,32 @@ export default function ClientHome() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const { data: matchData } = await supabase
-      .from('matches')
-      .select('*')
-      .order('match_date', { ascending: true, nullsFirst: false })
-      .order('match_number')
+    const clientType = client.client_type || 'standard'
+
+    // Load assignments for this client type
+    const { data: assignData } = await supabase
+      .from('match_assignments')
+      .select('match_id')
+      .in('client_type', [clientType, 'all'])
+
+    const assignedIds = (assignData || []).map(a => a.match_id)
+
+    // Load only assigned matches
+    let matchData = []
+    if (assignedIds.length > 0) {
+      const { data } = await supabase
+        .from('matches')
+        .select('*')
+        .in('id', assignedIds)
+        .order('match_date', { ascending: true, nullsFirst: false })
+        .order('match_number')
+      matchData = data || []
+    }
+
+    // Load picks
     const { data: pickData } = await supabase
       .from('picks').select('*').eq('client_id', client.id)
+
     const picksMap = {}
     let pts = 0, total = 0
     ;(pickData || []).forEach(p => {
@@ -29,7 +48,8 @@ export default function ClientHome() {
       if (p.is_correct) pts++
       total++
     })
-    setMatches(matchData || [])
+
+    setMatches(matchData)
     setPicks(picksMap)
     setPoints(pts)
     setTotalPicks(total)
@@ -165,7 +185,6 @@ function MatchCard({ match: m, pick, saving, onPick, status }) {
   const isPast = status === 'finalizado'
   const isLive = status === 'en_curso'
   const isBlocked = hasPick || isPast || isLive
-
   const choiceLabel = (value) => value === 'home' ? m.home_team : value === 'away' ? m.away_team : 'Empate'
 
   const statusBadge = {
@@ -181,7 +200,7 @@ function MatchCard({ match: m, pick, saving, onPick, status }) {
     const isResult = isPast && m.result === value && !selected
     let bg = '#0a0f1e', border = '#2a3a55', color = '#8899bb'
     if (selected && !isPast && !isLive) { bg = '#e8281e22'; border = '#e8281e'; color = '#f0f4ff' }
-    if (selected && (isLive) && !isPast) { bg = '#eab30822'; border = '#eab308'; color = '#eab308' }
+    if (selected && isLive) { bg = '#eab30822'; border = '#eab308'; color = '#eab308' }
     if (isCorrect) { bg = '#22c55e22'; border = '#22c55e'; color = '#22c55e' }
     if (isWrong) { bg = '#ef444422'; border = '#ef4444'; color = '#ef4444' }
     if (isResult) { bg = '#22c55e11'; border = '#22c55e44'; color = '#22c55e88' }
@@ -199,7 +218,6 @@ function MatchCard({ match: m, pick, saving, onPick, status }) {
 
   return (
     <div className="card" style={{ padding: '20px' }}>
-      {/* Status badge */}
       <div style={{
         display: 'inline-block', padding: '4px 10px', borderRadius: '20px',
         fontSize: '11px', fontWeight: 700, marginBottom: '10px',
@@ -207,21 +225,15 @@ function MatchCard({ match: m, pick, saving, onPick, status }) {
       }}>
         {statusBadge.label}
       </div>
-
-      {/* Meta info */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
             {m.stage || 'Fase de Grupos'}{m.group_name ? ` · Grupo ${m.group_name}` : ''}
           </span>
-          {m.venue && (
-            <span style={{ fontSize: '11px', color: '#8899bb' }}>📍 {m.venue}</span>
-          )}
+          {m.venue && <span style={{ fontSize: '11px', color: '#8899bb' }}>📍 {m.venue}</span>}
         </div>
         <span style={{ fontSize: '12px', color: '#8899bb' }}>{formatDate(m.match_date)}</span>
       </div>
-
-      {/* Teams */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0' }}>
         <span style={{ fontSize: '18px', fontWeight: 700, flex: 1 }}>{m.home_team}</span>
         {isPast
@@ -230,14 +242,11 @@ function MatchCard({ match: m, pick, saving, onPick, status }) {
         }
         <span style={{ fontSize: '18px', fontWeight: 700, flex: 1, textAlign: 'right' }}>{m.away_team}</span>
       </div>
-
-      {/* Buttons */}
       <div style={{ display: 'flex', gap: '8px' }}>
         {optionBtn('home', m.home_team)}
         {optionBtn('draw', 'Empate')}
         {optionBtn('away', m.away_team)}
       </div>
-
       {saving && <p style={{ fontSize: '12px', color: '#8899bb', marginTop: '8px', textAlign: 'center' }}>Guardando...</p>}
       {hasPick && !isPast && !isLive && <p style={{ fontSize: '12px', color: '#8899bb', marginTop: '8px', textAlign: 'center' }}>🔒 Selección confirmada y bloqueada</p>}
       {(isPast || isLive) && !hasPick && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px', textAlign: 'center' }}>⛔ Ya no es posible hacer una predicción</p>}
