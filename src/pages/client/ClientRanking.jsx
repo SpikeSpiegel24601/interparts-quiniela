@@ -61,13 +61,14 @@ export default function ClientRanking() {
     return LEGENDS[index % LEGENDS.length]
   }
 
+  const top10 = leaderboard.slice(0, 10)
+  const myInTop10 = myPos < 10
+
   return (
     <div>
-      <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>TABLA DE POSICIONES</h1>
-      <p style={{ color: '#8899bb', marginBottom: '24px' }}>
-        {leaderboard.length} participantes · Actualizado en tiempo real
-      </p>
+      <h1 style={{ fontSize: '36px', marginBottom: '32px' }}>TABLA DE POSICIONES</h1>
 
+      {/* My position card */}
       {myData && (
         <div className="card" style={{
           marginBottom: '24px', borderColor: '#e8281e',
@@ -76,10 +77,9 @@ export default function ClientRanking() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: '12px', color: '#8899bb', marginBottom: '4px' }}>TU POSICIÓN</div>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: '48px', color: '#e8281e', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: '56px', color: '#e8281e', lineHeight: 1 }}>
                 #{myPos + 1}
               </div>
-              <div style={{ color: '#8899bb', fontSize: '13px' }}>de {leaderboard.length} participantes</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '36px' }}>{getLegend(myPos).emoji}</div>
@@ -87,7 +87,7 @@ export default function ClientRanking() {
               <div style={{ fontSize: '11px', color: '#8899bb' }}>tu apodo</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: '48px', color: '#ffd700', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: '56px', color: '#ffd700', lineHeight: 1 }}>
                 {myData.points}
               </div>
               <div style={{ color: '#8899bb', fontSize: '13px' }}>puntos</div>
@@ -96,13 +96,17 @@ export default function ClientRanking() {
         </div>
       )}
 
+      {/* Top 10 */}
       <div className="card">
-        <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>RANKING GENERAL</h3>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '24px' }}>🏆 TOP RANKING</h3>
+          <span style={{ fontSize: '12px', color: '#8899bb' }}>los 10 mejores</span>
+        </div>
         {loading ? (
-          <p style={{ color: '#8899bb' }}>Cargando ranking...</p>
+          <p style={{ color: '#8899bb' }}>Cargando...</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {leaderboard.map((c, i) => {
+            {top10.map((c, i) => {
               const isMe = c.id === client.id
               const legend = getLegend(i)
               const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
@@ -133,6 +137,35 @@ export default function ClientRanking() {
                 </div>
               )
             })}
+
+            {/* If user is not in top 10, show them separately */}
+            {!myInTop10 && myData && (
+              <>
+                <div style={{ textAlign: 'center', color: '#4a5a7a', fontSize: '13px', padding: '4px' }}>• • •</div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '12px 14px', borderRadius: '8px',
+                  background: '#e8281e22', border: '1px solid #e8281e'
+                }}>
+                  <div style={{ width: '32px', textAlign: 'center',
+                    fontFamily: 'Bebas Neue', fontSize: '20px', color: '#4a5a7a' }}>
+                    {myPos + 1}
+                  </div>
+                  <div style={{ fontSize: '24px' }}>{getLegend(myPos).emoji}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                      {getLegend(myPos).name}
+                      <span style={{ color: '#e8281e', fontSize: '11px', marginLeft: '8px' }}>← eres tú</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>{myData.total} picks realizados</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontFamily: 'Bebas Neue', fontSize: '24px', color: '#ffd700' }}>{myData.points}</div>
+                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>pts</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
