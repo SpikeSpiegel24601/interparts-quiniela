@@ -49,7 +49,7 @@ export default function ClientLayout() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <NavLink to="/cliente" end style={linkStyle}>🎯 Mis picks</NavLink>
+          <NavLink to="/cliente" end style={linkStyle}>⚽ Mis juegos</NavLink>
           <NavLink to="/cliente/ranking" style={linkStyle}>🏆 Ranking</NavLink>
           <button onClick={logout} className="btn btn-ghost"
             style={{ padding: '8px 12px', fontSize: '13px' }}>Salir</button>
