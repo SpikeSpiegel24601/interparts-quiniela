@@ -3,12 +3,8 @@ import { supabase } from '../../lib/supabase.js'
 import { formatDate } from '../../lib/helpers.js'
 
 const STAGES = [
-  'Fase de Grupos',
-  'Octavos de Final',
-  'Cuartos de Final',
-  'Semifinal',
-  'Tercer Lugar',
-  'Final',
+  'Fase de Grupos', 'Octavos de Final', 'Cuartos de Final',
+  'Semifinal', 'Tercer Lugar', 'Final',
 ]
 
 const EMPTY = {
@@ -19,23 +15,33 @@ const EMPTY = {
 
 export default function AdminMatches() {
   const [matches, setMatches] = useState([])
+  const [assignments, setAssignments] = useState({}) // match_id -> ['vip', 'standard', 'all']
   const [form, setForm] = useState(EMPTY)
   const [editing, setEditing] = useState(null)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
 
-  useEffect(() => { loadMatches() }, [])
+  useEffect(() => { loadAll() }, [])
 
-  async function loadMatches() {
-    const { data } = await supabase.from('matches').select('*').order('match_number')
-    setMatches(data || [])
+  async function loadAll() {
+    const [{ data: m }, { data: a }] = await Promise.all([
+      supabase.from('matches').select('*').order('match_number'),
+      supabase.from('match_assignments').select('*')
+    ])
+    setMatches(m || [])
+    // Build assignments map: match_id -> array of client_types
+    const map = {}
+    ;(a || []).forEach(r => {
+      if (!map[r.match_id]) map[r.match_id] = []
+      map[r.match_id].push(r.client_type)
+    })
+    setAssignments(map)
   }
 
   async function saveMatch(e) {
     e.preventDefault()
     setLoading(true)
     setMsg('')
-
     const payload = {
       match_number: parseInt(form.match_number),
       home_team: form.home_team.trim(),
@@ -47,35 +53,49 @@ export default function AdminMatches() {
       home_score: form.home_score !== '' ? parseInt(form.home_score) : null,
       away_score: form.away_score !== '' ? parseInt(form.away_score) : null,
     }
-
     if (payload.home_score !== null && payload.away_score !== null) {
       if (payload.home_score > payload.away_score) payload.result = 'home'
       else if (payload.away_score > payload.home_score) payload.result = 'away'
       else payload.result = 'draw'
-    } else {
-      payload.result = null
-    }
+    } else { payload.result = null }
 
-    let error
+    let error, matchId
     if (editing) {
       ;({ error } = await supabase.from('matches').update(payload).eq('id', editing))
+      matchId = editing
       if (!error && payload.result) {
         await supabase.from('picks').update({ is_correct: false }).eq('match_id', editing)
         await supabase.from('picks').update({ is_correct: true }).eq('match_id', editing).eq('pick', payload.result)
       }
     } else {
-      ;({ error } = await supabase.from('matches').insert(payload))
+      const { data, error: e } = await supabase.from('matches').insert(payload).select().single()
+      error = e
+      matchId = data?.id
     }
 
     if (error) setMsg('Error: ' + error.message)
-    else { setMsg('✅ Guardado'); setForm(EMPTY); setEditing(null); loadMatches() }
+    else { setMsg('✅ Guardado'); setForm(EMPTY); setEditing(null); loadAll() }
     setLoading(false)
+  }
+
+  async function toggleAssignment(matchId, type) {
+    const current = assignments[matchId] || []
+    if (current.includes(type)) {
+      // Remove
+      await supabase.from('match_assignments')
+        .delete().eq('match_id', matchId).eq('client_type', type)
+    } else {
+      // Add
+      await supabase.from('match_assignments')
+        .insert({ match_id: matchId, client_type: type })
+    }
+    loadAll()
   }
 
   async function deleteMatch(id) {
     if (!confirm('¿Eliminar este partido?')) return
     await supabase.from('matches').delete().eq('id', id)
-    loadMatches()
+    loadAll()
   }
 
   function editMatch(m) {
@@ -97,13 +117,9 @@ export default function AdminMatches() {
   const lbl = (text) => (
     <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>{text}</label>
   )
-
   const inp = (label, key, type = 'text', placeholder = '') => (
-    <div>
-      {lbl(label)}
-      <input type={type} value={form[key]} placeholder={placeholder}
-        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
-    </div>
+    <div>{lbl(label)}<input type={type} value={form[key]} placeholder={placeholder}
+      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} /></div>
   )
 
   const statusBadge = (m) => {
@@ -112,12 +128,28 @@ export default function AdminMatches() {
     return { label: 'PRÓXIMO', color: '#22c55e', bg: '#22c55e22' }
   }
 
+  const assignBtn = (matchId, type, label, color) => {
+    const active = (assignments[matchId] || []).includes(type)
+    return (
+      <button onClick={() => toggleAssignment(matchId, type)}
+        style={{
+          padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+          cursor: 'pointer', border: `1px solid ${color}`,
+          background: active ? color + '33' : 'transparent',
+          color: active ? color : '#4a5a7a',
+          transition: 'all 0.15s'
+        }}>
+        {active ? '✓ ' : '+ '}{label}
+      </button>
+    )
+  }
+
   return (
     <div>
       <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>
         {editing ? 'EDITAR PARTIDO' : 'NUEVO PARTIDO'}
       </h1>
-      <p style={{ color: '#8899bb', marginBottom: '24px' }}>Carga los partidos y actualiza resultados aquí</p>
+      <p style={{ color: '#8899bb', marginBottom: '24px' }}>Carga partidos, resultados y asigna quién puede verlos</p>
 
       <div className="card" style={{ marginBottom: '32px' }}>
         <form onSubmit={saveMatch}>
@@ -148,9 +180,7 @@ export default function AdminMatches() {
               </button>
               {editing && (
                 <button className="btn btn-ghost" type="button"
-                  onClick={() => { setEditing(null); setForm(EMPTY) }}>
-                  Cancelar
-                </button>
+                  onClick={() => { setEditing(null); setForm(EMPTY) }}>Cancelar</button>
               )}
             </div>
           </div>
@@ -159,7 +189,10 @@ export default function AdminMatches() {
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>PARTIDOS ({matches.length})</h2>
+        <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>PARTIDOS ({matches.length})</h2>
+        <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '20px' }}>
+          Activa quién puede ver cada partido — <span style={{ color: '#ffd700' }}>⭐ VIP</span> y/o <span style={{ color: '#8899bb' }}>Standard</span>
+        </p>
         {matches.length === 0 ? (
           <p style={{ color: '#8899bb' }}>No hay partidos cargados aún.</p>
         ) : (
@@ -167,7 +200,7 @@ export default function AdminMatches() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #2a3a55' }}>
-                  {['#', 'Estado', 'Fase', 'Partido', 'Sede', 'Fecha', 'Marcador', ''].map(h => (
+                  {['#', 'Estado', 'Partido', 'Sede', 'Fecha', 'Asignado a', ''].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left',
                       color: '#8899bb', fontSize: '12px', fontWeight: 600 }}>{h}</th>
                   ))}
@@ -185,12 +218,18 @@ export default function AdminMatches() {
                           {status.label}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', color: '#8899bb', fontSize: '12px' }}>{m.stage || '—'}</td>
-                      <td style={{ padding: '12px', fontWeight: 600 }}>{m.home_team} vs {m.away_team}</td>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ fontWeight: 600 }}>{m.home_team} vs {m.away_team}</div>
+                        <div style={{ fontSize: '11px', color: '#8899bb' }}>{m.stage}</div>
+                      </td>
                       <td style={{ padding: '12px', color: '#8899bb', fontSize: '12px' }}>{m.venue || '—'}</td>
                       <td style={{ padding: '12px', color: '#8899bb', fontSize: '12px' }}>{formatDate(m.match_date)}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Bebas Neue', fontSize: '20px' }}>
-                        {m.home_score !== null ? `${m.home_score} — ${m.away_score}` : '— vs —'}
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {assignBtn(m.id, 'vip', '⭐ VIP', '#ffd700')}
+                          {assignBtn(m.id, 'standard', 'Standard', '#8899bb')}
+                          {assignBtn(m.id, 'all', 'Todos', '#e8281e')}
+                        </div>
                       </td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
