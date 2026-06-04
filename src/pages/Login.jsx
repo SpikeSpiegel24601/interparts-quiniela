@@ -6,6 +6,7 @@ export default function Login() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [view, setView] = useState('main') // main | login
   const navigate = useNavigate()
 
   async function handleLogin(e) {
@@ -40,7 +41,6 @@ export default function Login() {
       localStorage.setItem('role', 'client')
       localStorage.setItem('client', JSON.stringify(client))
       setLoading(false)
-      // Si no se ha registrado, manda al registro
       if (!client.is_registered) {
         navigate('/registro')
       } else {
@@ -70,39 +70,65 @@ export default function Login() {
         </p>
       </div>
 
-      <div className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <h3 style={{ fontSize: '20px', marginBottom: '6px' }}>Ingresa tu código</h3>
-        <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '24px' }}>
-          Tu código único fue enviado por tu vendedor
-        </p>
-        <form onSubmit={handleLogin}>
-          <input
-            value={code}
-            onChange={e => setCode(e.target.value)}
-            placeholder="Ej: XXXX-XXXX"
-            style={{ marginBottom: '16px', fontSize: '18px',
-              textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}
-            autoFocus
-          />
-          {error && (
-            <p style={{ color: '#ef4444', fontSize: '13px',
-              marginBottom: '16px', textAlign: 'center' }}>{error}</p>
-          )}
-          <button className="btn btn-primary" type="submit"
-            disabled={loading || !code.trim()}
-            style={{ width: '100%', fontSize: '16px', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Verificando...' : 'Entrar →'}
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button onClick={() => navigate('/recuperar')}
-            style={{ background: 'none', border: 'none', color: '#8899bb',
-              fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
-            ¿Olvidaste tu código?
-          </button>
+      {view === 'main' && (
+        <div className="card" style={{ width: '100%', maxWidth: '380px' }}>
+          <h3 style={{ fontSize: '20px', marginBottom: '24px', textAlign: 'center' }}>
+            ¿Qué deseas hacer?
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button className="btn btn-primary" onClick={() => setView('login')}
+              style={{ fontSize: '16px', padding: '14px' }}>
+              🔑 Ya tengo un código
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate('/registro')}
+              style={{ fontSize: '16px', padding: '14px', border: '1px solid #2a3a55' }}>
+              📝 Registrarme por primera vez
+            </button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <button onClick={() => navigate('/recuperar')}
+              style={{ background: 'none', border: 'none', color: '#8899bb',
+                fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
+              ¿Olvidaste tu código?
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {view === 'login' && (
+        <div className="card" style={{ width: '100%', maxWidth: '380px' }}>
+          <h3 style={{ fontSize: '20px', marginBottom: '6px' }}>Ingresa tu código</h3>
+          <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '24px' }}>
+            El código que recibiste al registrarte
+          </p>
+          <form onSubmit={handleLogin}>
+            <input
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder="Ej: XXXX-XXXX"
+              style={{ marginBottom: '16px', fontSize: '18px',
+                textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}
+              autoFocus
+            />
+            {error && (
+              <p style={{ color: '#ef4444', fontSize: '13px',
+                marginBottom: '16px', textAlign: 'center' }}>{error}</p>
+            )}
+            <button className="btn btn-primary" type="submit"
+              disabled={loading || !code.trim()}
+              style={{ width: '100%', fontSize: '16px', opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Verificando...' : 'Entrar →'}
+            </button>
+          </form>
+          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <button onClick={() => setView('main')}
+              style={{ background: 'none', border: 'none', color: '#8899bb',
+                fontSize: '13px', cursor: 'pointer' }}>
+              ← Regresar
+            </button>
+          </div>
+        </div>
+      )}
 
       <p style={{ color: '#3a4a6a', fontSize: '12px', marginTop: '32px' }}>
         Interparts Monterrey · interpartsmty.com.mx
