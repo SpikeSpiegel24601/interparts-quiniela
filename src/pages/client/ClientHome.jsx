@@ -54,8 +54,14 @@ export default function ClientHome() {
     setSaving(null)
   }
 
+  function getStatus(m) {
+    if (m.result !== null) return 'finalizado'
+    if (m.match_date && new Date(m.match_date) < new Date()) return 'en_curso'
+    return 'proximo'
+  }
+
   const now = new Date()
-  const todayMatches = matches.filter(m => {
+  const availableMatches = matches.filter(m => {
     if (!m.match_date) return true
     return new Date(m.match_date) <= new Date(now.getTime() + 24 * 60 * 60 * 1000)
   })
@@ -93,19 +99,18 @@ export default function ClientHome() {
         </div>
       )}
 
+      {/* Score card */}
       <div className="card" style={{
         marginBottom: '24px', textAlign: 'center',
         background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)'
       }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: '72px', color: '#e8281e', lineHeight: 1 }}>
-          {points}
-        </div>
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: '72px', color: '#e8281e', lineHeight: 1 }}>{points}</div>
         <div style={{ color: '#8899bb', fontSize: '15px' }}>
           puntos acumulados · {totalPicks} partidos jugados
         </div>
       </div>
 
-      {todayMatches.length > 0 && (
+      {availableMatches.length > 0 && (
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ fontSize: '28px', marginBottom: '12px', color: '#f0f4ff' }}>MIS JUEGOS</h2>
           <div style={{
@@ -119,8 +124,10 @@ export default function ClientHome() {
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {todayMatches.map(m => (
-              <MatchCard key={m.id} match={m} pick={picks[m.id]} saving={saving === m.id} onPick={requestPick} />
+            {availableMatches.map(m => (
+              <MatchCard key={m.id} match={m} pick={picks[m.id]}
+                saving={saving === m.id} onPick={requestPick}
+                status={getStatus(m)} />
             ))}
           </div>
         </div>
@@ -153,10 +160,19 @@ export default function ClientHome() {
   )
 }
 
-function MatchCard({ match: m, pick, saving, onPick }) {
+function MatchCard({ match: m, pick, saving, onPick, status }) {
   const hasPick = !!pick
-  const isPast = m.result !== null
+  const isPast = status === 'finalizado'
+  const isLive = status === 'en_curso'
+  const isBlocked = hasPick || isPast || isLive
+
   const choiceLabel = (value) => value === 'home' ? m.home_team : value === 'away' ? m.away_team : 'Empate'
+
+  const statusBadge = {
+    finalizado: { label: '🔴 PARTIDO FINALIZADO', color: '#ef4444', bg: '#ef444422' },
+    en_curso:   { label: '🟡 EN CURSO',           color: '#eab308', bg: '#eab30822' },
+    proximo:    { label: '🟢 PRÓXIMO PARTIDO',     color: '#22c55e', bg: '#22c55e22' },
+  }[status]
 
   const optionBtn = (value, label) => {
     const selected = pick?.pick === value
@@ -164,16 +180,18 @@ function MatchCard({ match: m, pick, saving, onPick }) {
     const isWrong = isPast && selected && pick?.is_correct === false
     const isResult = isPast && m.result === value && !selected
     let bg = '#0a0f1e', border = '#2a3a55', color = '#8899bb'
-    if (selected && !isPast) { bg = '#e8281e22'; border = '#e8281e'; color = '#f0f4ff' }
+    if (selected && !isPast && !isLive) { bg = '#e8281e22'; border = '#e8281e'; color = '#f0f4ff' }
+    if (selected && (isLive) && !isPast) { bg = '#eab30822'; border = '#eab308'; color = '#eab308' }
     if (isCorrect) { bg = '#22c55e22'; border = '#22c55e'; color = '#22c55e' }
     if (isWrong) { bg = '#ef444422'; border = '#ef4444'; color = '#ef4444' }
     if (isResult) { bg = '#22c55e11'; border = '#22c55e44'; color = '#22c55e88' }
     return (
-      <button key={value} disabled={hasPick || saving}
-        onClick={() => !hasPick && !saving && onPick(m.id, value, choiceLabel(value))}
+      <button key={value} disabled={isBlocked || saving}
+        onClick={() => !isBlocked && !saving && onPick(m.id, value, choiceLabel(value))}
         style={{ flex: 1, padding: '12px 8px', borderRadius: '8px', fontSize: '13px',
           fontWeight: 600, background: bg, border: `1.5px solid ${border}`, color,
-          transition: 'all 0.15s', cursor: hasPick ? 'default' : 'pointer' }}>
+          transition: 'all 0.15s', cursor: isBlocked ? 'default' : 'pointer',
+          opacity: (isPast || isLive) && !selected ? 0.5 : 1 }}>
         {label}{isCorrect && ' ✓'}{isWrong && ' ✗'}
       </button>
     )
@@ -181,12 +199,29 @@ function MatchCard({ match: m, pick, saving, onPick }) {
 
   return (
     <div className="card" style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-        <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
-          Grupo {m.group_name || '?'} · Partido #{m.match_number}
-        </span>
+      {/* Status badge */}
+      <div style={{
+        display: 'inline-block', padding: '4px 10px', borderRadius: '20px',
+        fontSize: '11px', fontWeight: 700, marginBottom: '10px',
+        background: statusBadge.bg, color: statusBadge.color
+      }}>
+        {statusBadge.label}
+      </div>
+
+      {/* Meta info */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
+            {m.stage || 'Fase de Grupos'}{m.group_name ? ` · Grupo ${m.group_name}` : ''}
+          </span>
+          {m.venue && (
+            <span style={{ fontSize: '11px', color: '#8899bb' }}>📍 {m.venue}</span>
+          )}
+        </div>
         <span style={{ fontSize: '12px', color: '#8899bb' }}>{formatDate(m.match_date)}</span>
       </div>
+
+      {/* Teams */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0' }}>
         <span style={{ fontSize: '18px', fontWeight: 700, flex: 1 }}>{m.home_team}</span>
         {isPast
@@ -195,13 +230,17 @@ function MatchCard({ match: m, pick, saving, onPick }) {
         }
         <span style={{ fontSize: '18px', fontWeight: 700, flex: 1, textAlign: 'right' }}>{m.away_team}</span>
       </div>
+
+      {/* Buttons */}
       <div style={{ display: 'flex', gap: '8px' }}>
         {optionBtn('home', m.home_team)}
         {optionBtn('draw', 'Empate')}
         {optionBtn('away', m.away_team)}
       </div>
+
       {saving && <p style={{ fontSize: '12px', color: '#8899bb', marginTop: '8px', textAlign: 'center' }}>Guardando...</p>}
-      {hasPick && !isPast && <p style={{ fontSize: '12px', color: '#8899bb', marginTop: '8px', textAlign: 'center' }}>🔒 Selección confirmada y bloqueada</p>}
+      {hasPick && !isPast && !isLive && <p style={{ fontSize: '12px', color: '#8899bb', marginTop: '8px', textAlign: 'center' }}>🔒 Selección confirmada y bloqueada</p>}
+      {(isPast || isLive) && !hasPick && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px', textAlign: 'center' }}>⛔ Ya no es posible hacer una predicción</p>}
     </div>
   )
 }
