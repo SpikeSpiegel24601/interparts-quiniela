@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
-import { formatDate, getPrize, getNextPrize } from '../../lib/helpers.js'
+import { formatDate } from '../../lib/helpers.js'
 
 export default function ClientHome() {
   const [client] = useState(() => JSON.parse(localStorage.getItem('client') || '{}'))
@@ -64,9 +64,6 @@ export default function ClientHome() {
     return new Date(m.match_date) > new Date(now.getTime() + 24 * 60 * 60 * 1000)
   })
 
-  const prize = getPrize(points)
-  const nextPrize = getNextPrize(points)
-
   if (loading) return <div style={{ color: '#8899bb', padding: '40px', textAlign: 'center' }}>Cargando...</div>
 
   return (
@@ -98,18 +95,14 @@ export default function ClientHome() {
 
       <div className="card" style={{
         marginBottom: '24px', textAlign: 'center',
-        background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)',
-        borderColor: prize ? prize.color : '#2a3a55'
+        background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)'
       }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: '64px', color: '#e8281e', lineHeight: 1 }}>{points}</div>
-        <div style={{ color: '#8899bb', fontSize: '14px', marginBottom: '8px' }}>puntos de {totalPicks} partidos jugados</div>
-        {prize ? (
-          <div style={{ fontSize: '18px', fontWeight: 600 }}>{prize.emoji} ¡Vas por el <span style={{ color: prize.color }}>{prize.label}</span>!</div>
-        ) : nextPrize ? (
-          <div style={{ color: '#8899bb', fontSize: '14px' }}>Te faltan <span style={{ color: '#ffd700', fontWeight: 700 }}>{nextPrize.needed} puntos</span> para ganar {nextPrize.prize.emoji} {nextPrize.prize.label}</div>
-        ) : (
-          <div style={{ color: '#8899bb', fontSize: '14px' }}>Haz tus picks para acumular puntos</div>
-        )}
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: '72px', color: '#e8281e', lineHeight: 1 }}>
+          {points}
+        </div>
+        <div style={{ color: '#8899bb', fontSize: '15px' }}>
+          puntos acumulados · {totalPicks} partidos jugados
+        </div>
       </div>
 
       {todayMatches.length > 0 && (
