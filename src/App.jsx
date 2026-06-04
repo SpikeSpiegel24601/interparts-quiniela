@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import RecoverCode from './pages/RecoverCode.jsx'
 import AdminLayout from './pages/admin/AdminLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminMatches from './pages/admin/AdminMatches.jsx'
@@ -14,6 +16,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/registro" element={<Register />} />
+      <Route path="/recuperar" element={<RecoverCode />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="partidos" element={<AdminMatches />} />
