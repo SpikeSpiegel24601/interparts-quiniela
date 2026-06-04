@@ -21,9 +21,15 @@ export function getNextPrize(points) {
 
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('es-MX', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+  // Forzar hora de Monterrey (UTC-6, sin horario de verano en junio = CDT = UTC-5)
+  const date = new Date(dateStr)
+  return date.toLocaleString('es-MX', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
     timeZone: 'America/Monterrey'
   })
 }
