@@ -40,7 +40,12 @@ export default function Login() {
       localStorage.setItem('role', 'client')
       localStorage.setItem('client', JSON.stringify(client))
       setLoading(false)
-      navigate('/cliente')
+      // Si no se ha registrado, manda al registro
+      if (!client.is_registered) {
+        navigate('/registro')
+      } else {
+        navigate('/cliente')
+      }
       return
     }
 
@@ -68,13 +73,13 @@ export default function Login() {
       <div className="card" style={{ width: '100%', maxWidth: '380px' }}>
         <h3 style={{ fontSize: '20px', marginBottom: '6px' }}>Ingresa tu código</h3>
         <p style={{ color: '#8899bb', fontSize: '13px', marginBottom: '24px' }}>
-          Tu código único fue enviado por WhatsApp
+          Tu código único fue enviado por tu vendedor
         </p>
         <form onSubmit={handleLogin}>
           <input
             value={code}
             onChange={e => setCode(e.target.value)}
-            placeholder="Ej: CLI-001"
+            placeholder="Ej: XXXX-XXXX"
             style={{ marginBottom: '16px', fontSize: '18px',
               textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}
             autoFocus
@@ -89,6 +94,14 @@ export default function Login() {
             {loading ? 'Verificando...' : 'Entrar →'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button onClick={() => navigate('/recuperar')}
+            style={{ background: 'none', border: 'none', color: '#8899bb',
+              fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
+            ¿Olvidaste tu código?
+          </button>
+        </div>
       </div>
 
       <p style={{ color: '#3a4a6a', fontSize: '12px', marginTop: '32px' }}>
