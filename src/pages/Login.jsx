@@ -6,7 +6,7 @@ export default function Login() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState('main') // main | login
+  const [view, setView] = useState('main')
   const navigate = useNavigate()
 
   async function handleLogin(e) {
@@ -15,9 +15,19 @@ export default function Login() {
     setLoading(true)
     const input = code.trim().toUpperCase()
 
-    // Admin
+    // Admin 1 (Arturo)
     if (input === import.meta.env.VITE_ADMIN_PASSWORD?.toUpperCase()) {
       localStorage.setItem('role', 'admin')
+      localStorage.setItem('adminName', import.meta.env.VITE_ADMIN_NAME_1 || 'Admin')
+      setLoading(false)
+      navigate('/admin')
+      return
+    }
+
+    // Admin 2 (Mauricio)
+    if (input === import.meta.env.VITE_ADMIN_PASSWORD_2?.toUpperCase()) {
+      localStorage.setItem('role', 'admin')
+      localStorage.setItem('adminName', import.meta.env.VITE_ADMIN_NAME_2 || 'Admin')
       setLoading(false)
       navigate('/admin')
       return
