@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase.js'
 import { getPrize } from '../../lib/helpers.js'
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ clients: 0, matches: 0, picks: 0, pending: 0 })
+  const [stats, setStats] = useState({ clients: 0, matches: 0, picks: 0 })
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -14,15 +14,12 @@ export default function AdminDashboard() {
       supabase.from('clients').select('*', { count: 'exact', head: true }),
       supabase.from('matches').select('*', { count: 'exact', head: true }),
       supabase.from('picks').select('*', { count: 'exact', head: true }),
-      supabase.from('clients').select(`
-        id, name, code,
-        picks(is_correct)
-      `)
+      supabase.from('clients').select(`id, name, code, client_type, picks(is_correct)`)
     ])
 
     const board = (lb || []).map(c => ({
       ...c,
-      points: c.picks?.filter(p => p.is_correct).length || 0,
+      points: (c.picks?.filter(p => p.is_correct).length || 0) * 10,
       total: c.picks?.length || 0,
     })).sort((a, b) => b.points - a.points)
 
@@ -37,6 +34,16 @@ export default function AdminDashboard() {
       <div style={{ fontFamily: 'Bebas Neue', fontSize: '40px', color: '#e8281e' }}>{value}</div>
       <div style={{ color: '#8899bb', fontSize: '13px' }}>{label}</div>
     </div>
+  )
+
+  const typeBadge = (type) => (
+    <span style={{
+      padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+      background: type === 'vip' ? '#ffd70022' : '#2a3a55',
+      color: type === 'vip' ? '#ffd700' : '#8899bb'
+    }}>
+      {type === 'vip' ? '⭐ VIP' : 'Standard'}
+    </span>
   )
 
   return (
@@ -60,7 +67,7 @@ export default function AdminDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a3a55' }}>
-                {['#', 'Cliente', 'Código', 'Puntos', 'Picks', 'Premio'].map(h => (
+                {['#', 'Tipo', 'Cliente', 'Código', 'Puntos', 'Picks', 'Premio'].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: 'left',
                     color: '#8899bb', fontSize: '12px', fontWeight: 600 }}>{h}</th>
                 ))}
@@ -75,13 +82,14 @@ export default function AdminDashboard() {
                       fontSize: '20px', color: i < 3 ? '#ffd700' : '#8899bb' }}>
                       {i + 1}
                     </td>
+                    <td style={{ padding: '12px' }}>{typeBadge(c.client_type)}</td>
                     <td style={{ padding: '12px', fontWeight: 600 }}>{c.name}</td>
                     <td style={{ padding: '12px', color: '#8899bb', fontFamily: 'monospace' }}>{c.code}</td>
                     <td style={{ padding: '12px' }}>
                       <span style={{ fontFamily: 'Bebas Neue', fontSize: '22px', color: '#e8281e' }}>
                         {c.points}
                       </span>
-                      <span style={{ color: '#8899bb', fontSize: '12px' }}> / {c.total}</span>
+                      <span style={{ color: '#8899bb', fontSize: '12px' }}> / {c.total * 10}</span>
                     </td>
                     <td style={{ padding: '12px', color: '#8899bb' }}>{c.total}</td>
                     <td style={{ padding: '12px' }}>
