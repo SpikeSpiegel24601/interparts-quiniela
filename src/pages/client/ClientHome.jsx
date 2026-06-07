@@ -17,7 +17,6 @@ export default function ClientHome() {
   async function loadData() {
     const clientType = client.client_type || 'standard'
 
-    // Load assignments for this client type
     const { data: assignData } = await supabase
       .from('match_assignments')
       .select('match_id')
@@ -25,7 +24,6 @@ export default function ClientHome() {
 
     const assignedIds = (assignData || []).map(a => a.match_id)
 
-    // Load only assigned matches
     let matchData = []
     if (assignedIds.length > 0) {
       const { data } = await supabase
@@ -37,7 +35,6 @@ export default function ClientHome() {
       matchData = data || []
     }
 
-    // Load picks
     const { data: pickData } = await supabase
       .from('picks').select('*').eq('client_id', client.id)
 
@@ -45,7 +42,7 @@ export default function ClientHome() {
     let pts = 0, total = 0
     ;(pickData || []).forEach(p => {
       picksMap[p.match_id] = p
-      if (p.is_correct) pts++
+      if (p.is_correct) pts += 10
       total++
     })
 
@@ -119,7 +116,6 @@ export default function ClientHome() {
         </div>
       )}
 
-      {/* Score card */}
       <div className="card" style={{
         marginBottom: '24px', textAlign: 'center',
         background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)'
