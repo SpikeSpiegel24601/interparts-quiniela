@@ -6,10 +6,10 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ clients: 0, matches: 0, picks: 0 })
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null) // cliente seleccionado
+  const [selected, setSelected] = useState(null)
   const [clientPicks, setClientPicks] = useState([])
   const [loadingPicks, setLoadingPicks] = useState(false)
-  const [resetConfirm, setResetConfirm] = useState(null) // pick a resetear
+  const [resetConfirm, setResetConfirm] = useState(null)
   const [adminPass, setAdminPass] = useState('')
   const [resetMsg, setResetMsg] = useState('')
 
@@ -42,12 +42,19 @@ export default function AdminDashboard() {
 
     const { data } = await supabase
       .from('picks')
-      .select('*, matches(home_team, away_team, result, home_score, away_score, match_date, stage, group_name)')
+      .select('*, matches(id, home_team, away_team, result, home_score, away_score, match_date, stage, group_name)')
       .eq('client_id', client.id)
       .order('created_at')
 
     setClientPicks(data || [])
     setLoadingPicks(false)
+  }
+
+  function getMatchStatus(m) {
+    if (!m) return 'proximo'
+    if (m.result !== null) return 'finalizado'
+    if (m.match_date && new Date(m.match_date) < new Date()) return 'en_curso'
+    return 'proximo'
   }
 
   async function resetPick() {
@@ -68,8 +75,8 @@ export default function AdminDashboard() {
   }
 
   const pickLabel = (pick, m) => {
-    if (pick === 'home') return m.home_team
-    if (pick === 'away') return m.away_team
+    if (pick === 'home') return m?.home_team
+    if (pick === 'away') return m?.away_team
     return 'Empate'
   }
 
@@ -115,17 +122,15 @@ export default function AdminDashboard() {
               <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>
                 Ingresa tu contraseña de admin para confirmar:
               </label>
-              <input
-                type="password"
-                value={adminPass}
+              <input type="password" value={adminPass}
                 onChange={e => setAdminPass(e.target.value)}
-                placeholder="Contraseña admin"
-                autoFocus
-              />
+                placeholder="Contraseña admin" autoFocus />
             </div>
-            {resetMsg && <p style={{ color: resetMsg.includes('✅') ? '#22c55e' : '#ef4444', fontSize: '13px', marginBottom: '12px' }}>{resetMsg}</p>}
+            {resetMsg && <p style={{ color: resetMsg.includes('✅') ? '#22c55e' : '#ef4444',
+              fontSize: '13px', marginBottom: '12px' }}>{resetMsg}</p>}
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn btn-ghost" onClick={() => { setResetConfirm(null); setAdminPass(''); setResetMsg('') }}
+              <button className="btn btn-ghost"
+                onClick={() => { setResetConfirm(null); setAdminPass(''); setResetMsg('') }}
                 style={{ flex: 1 }}>Cancelar</button>
               <button className="btn btn-primary" onClick={resetPick}
                 style={{ flex: 1, background: '#ef4444' }}>Resetear pick</button>
@@ -160,8 +165,7 @@ export default function AdminDashboard() {
                 const prize = getPrize(c.points)
                 const isSelected = selected?.id === c.id
                 return (
-                  <div key={c.id}
-                    onClick={() => loadClientPicks(c)}
+                  <div key={c.id} onClick={() => loadClientPicks(c)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '12px',
                       padding: '12px 14px', borderRadius: '8px', cursor: 'pointer',
@@ -169,11 +173,9 @@ export default function AdminDashboard() {
                       border: `1px solid ${isSelected ? '#e8281e' : '#2a3a55'}`,
                       transition: 'all 0.15s'
                     }}>
-                    <div style={{
-                      width: '28px', textAlign: 'center',
+                    <div style={{ width: '28px', textAlign: 'center',
                       fontFamily: 'Bebas Neue', fontSize: '18px',
-                      color: i < 3 ? '#ffd700' : '#4a5a7a'
-                    }}>
+                      color: i < 3 ? '#ffd700' : '#4a5a7a' }}>
                       {i + 1}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -209,6 +211,16 @@ export default function AdminDashboard() {
                 style={{ padding: '4px 10px', fontSize: '12px' }}>✕</button>
             </div>
 
+            {/* Info sobre qué picks se pueden resetear */}
+            <div style={{
+              background: '#1a1a2a', border: '1px solid #2a3a55',
+              borderRadius: '8px', padding: '10px 12px', marginBottom: '16px'
+            }}>
+              <p style={{ fontSize: '11px', color: '#8899bb', margin: 0 }}>
+                🗑️ Solo se pueden resetear picks de partidos <strong style={{ color: '#22c55e' }}>Próximos</strong>. No se pueden resetear picks de partidos <strong style={{ color: '#eab308' }}>En Curso</strong> o <strong style={{ color: '#ef4444' }}>Finalizados</strong>.
+              </p>
+            </div>
+
             {resetMsg && !resetConfirm && (
               <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px',
                 background: '#22c55e22', border: '1px solid #22c55e' }}>
@@ -224,8 +236,11 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {clientPicks.map(p => {
                   const m = p.matches
+                  const matchStatus = getMatchStatus(m)
                   const isCorrect = p.is_correct === true
                   const isWrong = p.is_correct === false
+                  const canReset = matchStatus === 'proximo'
+
                   return (
                     <div key={p.id} style={{
                       padding: '12px', borderRadius: '8px', background: '#0a0f1e',
@@ -236,10 +251,17 @@ export default function AdminDashboard() {
                           <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>
                             {m?.home_team} vs {m?.away_team}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#8899bb' }}>
+                          <div style={{ fontSize: '11px', color: '#8899bb', marginBottom: '6px' }}>
                             {m?.stage} · {formatDate(m?.match_date)}
+                            {' · '}
+                            <span style={{
+                              color: matchStatus === 'proximo' ? '#22c55e' : matchStatus === 'en_curso' ? '#eab308' : '#ef4444',
+                              fontWeight: 600
+                            }}>
+                              {matchStatus === 'proximo' ? '🟢 Próximo' : matchStatus === 'en_curso' ? '🟡 En Curso' : '🔴 Finalizado'}
+                            </span>
                           </div>
-                          <div style={{ marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <span style={{
                               padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
                               background: '#e8281e22', color: '#e8281e'
@@ -251,13 +273,19 @@ export default function AdminDashboard() {
                             {p.is_correct === null && <span style={{ color: '#8899bb', fontSize: '12px' }}>⏳ Pendiente</span>}
                           </div>
                         </div>
-                        <button
-                          onClick={() => { setResetConfirm(p); setResetMsg('') }}
-                          className="btn btn-ghost"
-                          style={{ padding: '6px 10px', fontSize: '12px', color: '#ef4444', flexShrink: 0 }}
-                          title="Resetear pick">
-                          🗑️
-                        </button>
+                        {canReset ? (
+                          <button
+                            onClick={() => { setResetConfirm(p); setResetMsg('') }}
+                            className="btn btn-ghost"
+                            style={{ padding: '6px 10px', fontSize: '12px', color: '#ef4444', flexShrink: 0 }}
+                            title="Resetear pick">
+                            🗑️
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#4a5a7a', flexShrink: 0, paddingLeft: '8px' }}>
+                            🔒
+                          </span>
+                        )}
                       </div>
                     </div>
                   )
