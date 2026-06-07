@@ -47,7 +47,7 @@ export default function ClientRanking() {
       .select('id, name, picks(is_correct)')
     const board = (data || []).map(c => ({
       ...c,
-      points: c.picks?.filter(p => p.is_correct).length || 0,
+      points: (c.picks?.filter(p => p.is_correct).length || 0) * 10,
       total: c.picks?.length || 0,
     })).sort((a, b) => b.points - a.points || b.total - a.total)
     setLeaderboard(board)
@@ -68,7 +68,6 @@ export default function ClientRanking() {
     <div>
       <h1 style={{ fontSize: '36px', marginBottom: '32px' }}>TABLA DE POSICIONES</h1>
 
-      {/* My position card */}
       {myData && (
         <div className="card" style={{
           marginBottom: '24px', borderColor: '#e8281e',
@@ -96,7 +95,6 @@ export default function ClientRanking() {
         </div>
       )}
 
-      {/* Top 10 */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '24px' }}>🏆 TOP RANKING</h3>
@@ -138,7 +136,6 @@ export default function ClientRanking() {
               )
             })}
 
-            {/* If user is not in top 10, show them separately */}
             {!myInTop10 && myData && (
               <>
                 <div style={{ textAlign: 'center', color: '#4a5a7a', fontSize: '13px', padding: '4px' }}>• • •</div>
