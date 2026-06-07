@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { getPrize } from '../lib/helpers.js'
 
 export default function SellerView() {
   const navigate = useNavigate()
@@ -17,12 +16,12 @@ export default function SellerView() {
   async function loadClients() {
     const { data } = await supabase
       .from('clients')
-      .select('id, name, code, picks(is_correct)')
+      .select('id, name, code, client_type, picks(is_correct)')
       .eq('seller_id', seller.id)
 
     const sorted = (data || []).map(c => ({
       ...c,
-      points: c.picks?.filter(p => p.is_correct).length || 0,
+      points: (c.picks?.filter(p => p.is_correct).length || 0) * 10,
       total: c.picks?.length || 0,
     })).sort((a, b) => b.points - a.points)
 
@@ -32,9 +31,18 @@ export default function SellerView() {
 
   function logout() { localStorage.clear(); navigate('/') }
 
+  const typeBadge = (type) => (
+    <span style={{
+      padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+      background: type === 'vip' ? '#ffd70022' : '#2a3a55',
+      color: type === 'vip' ? '#ffd700' : '#8899bb'
+    }}>
+      {type === 'vip' ? '⭐ VIP' : 'Standard'}
+    </span>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1e' }}>
-      {/* Header */}
       <header style={{
         background: '#111827', borderBottom: '1px solid #2a3a55',
         padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
@@ -63,41 +71,36 @@ export default function SellerView() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {clients.map((c, i) => {
-              const prize = getPrize(c.points)
-              return (
-                <div key={c.id} className="card" style={{
-                  display: 'flex', alignItems: 'center', gap: '16px', padding: '16px'
+            {clients.map((c, i) => (
+              <div key={c.id} className="card" style={{
+                display: 'flex', alignItems: 'center', gap: '16px', padding: '16px'
+              }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: '#e8281e22', border: '1px solid #e8281e',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Bebas Neue', fontSize: '16px', color: '#e8281e', flexShrink: 0
                 }}>
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '50%',
-                    background: '#e8281e22', border: '1px solid #e8281e',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'Bebas Neue', fontSize: '16px', color: '#e8281e', flexShrink: 0
-                  }}>
-                    {i + 1}
+                  {i + 1}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600 }}>{c.name}</span>
+                    {typeBadge(c.client_type)}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>{c.name}</div>
-                    <div style={{ fontSize: '12px', color: '#8899bb' }}>
-                      Código: <span style={{ fontFamily: 'monospace', color: '#e8281e' }}>{c.code}</span>
-                      {' · '}{c.total} picks
-                    </div>
-                    {prize && (
-                      <div style={{ fontSize: '12px', color: prize.color, marginTop: '2px' }}>
-                        {prize.emoji} {prize.label}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'Bebas Neue', fontSize: '32px', color: '#ffd700', lineHeight: 1 }}>
-                      {c.points}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#4a5a7a' }}>puntos</div>
+                  <div style={{ fontSize: '12px', color: '#8899bb' }}>
+                    Código: <span style={{ fontFamily: 'monospace', color: '#e8281e' }}>{c.code}</span>
+                    {' · '}{c.total} picks
                   </div>
                 </div>
-              )
-            })}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'Bebas Neue', fontSize: '32px', color: '#ffd700', lineHeight: 1 }}>
+                    {c.points}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#4a5a7a' }}>puntos</div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
