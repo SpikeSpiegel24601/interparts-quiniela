@@ -15,7 +15,7 @@ const EMPTY = {
 
 export default function AdminMatches() {
   const [matches, setMatches] = useState([])
-  const [assignments, setAssignments] = useState({}) // match_id -> ['vip', 'standard', 'all']
+  const [assignments, setAssignments] = useState({})
   const [form, setForm] = useState(EMPTY)
   const [editing, setEditing] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -29,7 +29,6 @@ export default function AdminMatches() {
       supabase.from('match_assignments').select('*')
     ])
     setMatches(m || [])
-    // Build assignments map: match_id -> array of client_types
     const map = {}
     ;(a || []).forEach(r => {
       if (!map[r.match_id]) map[r.match_id] = []
@@ -59,18 +58,15 @@ export default function AdminMatches() {
       else payload.result = 'draw'
     } else { payload.result = null }
 
-    let error, matchId
+    let error
     if (editing) {
       ;({ error } = await supabase.from('matches').update(payload).eq('id', editing))
-      matchId = editing
       if (!error && payload.result) {
         await supabase.from('picks').update({ is_correct: false }).eq('match_id', editing)
         await supabase.from('picks').update({ is_correct: true }).eq('match_id', editing).eq('pick', payload.result)
       }
     } else {
-      const { data, error: e } = await supabase.from('matches').insert(payload).select().single()
-      error = e
-      matchId = data?.id
+      ;({ error } = await supabase.from('matches').insert(payload))
     }
 
     if (error) setMsg('Error: ' + error.message)
@@ -81,13 +77,9 @@ export default function AdminMatches() {
   async function toggleAssignment(matchId, type) {
     const current = assignments[matchId] || []
     if (current.includes(type)) {
-      // Remove
-      await supabase.from('match_assignments')
-        .delete().eq('match_id', matchId).eq('client_type', type)
+      await supabase.from('match_assignments').delete().eq('match_id', matchId).eq('client_type', type)
     } else {
-      // Add
-      await supabase.from('match_assignments')
-        .insert({ match_id: matchId, client_type: type })
+      await supabase.from('match_assignments').insert({ match_id: matchId, client_type: type })
     }
     loadAll()
   }
@@ -114,6 +106,19 @@ export default function AdminMatches() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function getStatus(m) {
+    if (m.result !== null) return 'finalizado'
+    if (m.match_date && new Date(m.match_date) < new Date()) return 'en_curso'
+    return 'proximo'
+  }
+
+  const statusBadge = (m) => {
+    const s = getStatus(m)
+    if (s === 'finalizado') return { label: 'FINALIZADO', color: '#ef4444', bg: '#ef444422' }
+    if (s === 'en_curso') return { label: 'EN CURSO', color: '#eab308', bg: '#eab30822' }
+    return { label: 'PRÓXIMO', color: '#22c55e', bg: '#22c55e22' }
+  }
+
   const lbl = (text) => (
     <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>{text}</label>
   )
@@ -121,12 +126,6 @@ export default function AdminMatches() {
     <div>{lbl(label)}<input type={type} value={form[key]} placeholder={placeholder}
       onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} /></div>
   )
-
-  const statusBadge = (m) => {
-    if (m.result !== null) return { label: 'FINALIZADO', color: '#ef4444', bg: '#ef444422' }
-    if (m.match_date && new Date(m.match_date) < new Date()) return { label: 'EN CURSO', color: '#eab308', bg: '#eab30822' }
-    return { label: 'PRÓXIMO', color: '#22c55e', bg: '#22c55e22' }
-  }
 
   const assignBtn = (matchId, type, label, color) => {
     const active = (assignments[matchId] || []).includes(type)
@@ -149,7 +148,17 @@ export default function AdminMatches() {
       <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>
         {editing ? 'EDITAR PARTIDO' : 'NUEVO PARTIDO'}
       </h1>
-      <p style={{ color: '#8899bb', marginBottom: '24px' }}>Carga partidos, resultados y asigna quién puede verlos</p>
+      <p style={{ color: '#8899bb', marginBottom: '16px' }}>Carga partidos, resultados y asigna quién puede verlos</p>
+
+      {/* Warning */}
+      <div style={{
+        background: '#1a1a2a', border: '1px solid #2a3a55',
+        borderRadius: '8px', padding: '10px 14px', marginBottom: '20px'
+      }}>
+        <p style={{ fontSize: '12px', color: '#8899bb', margin: 0 }}>
+          ⚠️ No es posible editar ni eliminar partidos <strong style={{ color: '#eab308' }}>En Curso</strong> o <strong style={{ color: '#ef4444' }}>Finalizados</strong>. Solo se pueden modificar partidos <strong style={{ color: '#22c55e' }}>Próximos</strong>.
+        </p>
+      </div>
 
       <div className="card" style={{ marginBottom: '32px' }}>
         <form onSubmit={saveMatch}>
@@ -209,6 +218,7 @@ export default function AdminMatches() {
               <tbody>
                 {matches.map(m => {
                   const status = statusBadge(m)
+                  const isProximo = getStatus(m) === 'proximo'
                   return (
                     <tr key={m.id} style={{ borderBottom: '1px solid #1a2235' }}>
                       <td style={{ padding: '12px', fontFamily: 'Bebas Neue', fontSize: '18px', color: '#8899bb' }}>{m.match_number}</td>
@@ -232,12 +242,18 @@ export default function AdminMatches() {
                         </div>
                       </td>
                       <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-ghost" onClick={() => editMatch(m)}
-                            style={{ padding: '6px 12px', fontSize: '12px' }}>✏️</button>
-                          <button className="btn btn-ghost" onClick={() => deleteMatch(m.id)}
-                            style={{ padding: '6px 12px', fontSize: '12px', color: '#ef4444' }}>🗑️</button>
-                        </div>
+                        {isProximo ? (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button className="btn btn-ghost" onClick={() => editMatch(m)}
+                              style={{ padding: '6px 12px', fontSize: '12px' }}>✏️</button>
+                            <button className="btn btn-ghost" onClick={() => deleteMatch(m.id)}
+                              style={{ padding: '6px 12px', fontSize: '12px', color: '#ef4444' }}>🗑️</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#4a5a7a', fontStyle: 'italic' }}>
+                            No editable
+                          </span>
+                        )}
                       </td>
                     </tr>
                   )
