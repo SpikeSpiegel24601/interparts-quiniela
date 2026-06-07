@@ -51,7 +51,7 @@ export default function AdminDashboard() {
   }
 
   async function resetPick() {
-    if (adminPass !== import.meta.env.VITE_ADMIN_PASSWORD) {
+    if (adminPass.toUpperCase() !== import.meta.env.VITE_ADMIN_PASSWORD?.toUpperCase()) {
       setResetMsg('❌ Contraseña incorrecta')
       return
     }
