@@ -98,7 +98,6 @@ export default function ClientRanking() {
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '24px' }}>🏆 RANKING</h3>
-          <span style={{ fontSize: '12px', color: '#8899bb' }}>los 10 mejores</span>
         </div>
         {loading ? (
           <p style={{ color: '#8899bb' }}>Cargando...</p>
