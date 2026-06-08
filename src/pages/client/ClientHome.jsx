@@ -12,11 +12,19 @@ export default function ClientHome() {
   const [saving, setSaving] = useState(null)
   const [confirm, setConfirm] = useState(null)
   const [tab, setTab] = useState('votar')
+  const [diasVisibles, setDiasVisibles] = useState(7)
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const clientType = client.client_type || 'standard'
+
+    // Cargar config de días visibles
+    const { data: configData } = await supabase
+      .from('config').select('value').eq('key', 'dias_visibles').single()
+    const dias = parseInt(configData?.value || '7')
+    setDiasVisibles(dias)
+
     const { data: assignData } = await supabase
       .from('match_assignments').select('match_id')
       .in('client_type', [clientType, 'all'])
@@ -74,26 +82,41 @@ export default function ClientHome() {
     return 'proximo'
   }
 
-  const now = new Date()
+  function getDayLabel(dateStr) {
+    if (!dateStr) return 'Sin fecha'
+    const d = new Date(dateStr)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(today.getDate() + 1)
+    const mty = (date) => date.toLocaleDateString('es-MX', { timeZone: 'America/Monterrey' })
+    if (mty(d) === mty(today)) return '🗓️ Hoy'
+    if (mty(d) === mty(tomorrow)) return '🗓️ Mañana'
+    return '🗓️ ' + d.toLocaleDateString('es-MX', {
+      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Monterrey'
+    })
+  }
 
-  // Para votar: próximos dentro de las próximas 24hrs o sin fecha, que no estén bloqueados
+  const now = new Date()
+  const limitDate = new Date(now.getTime() + diasVisibles * 24 * 60 * 60 * 1000)
+
   const votarMatches = matches.filter(m => {
     const status = getStatus(m)
     if (status === 'finalizado') return false
-    if (status === 'en_curso') return true // mostrar en curso también
+    if (status === 'en_curso') return true
     if (!m.match_date) return true
-    return new Date(m.match_date) <= new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    return new Date(m.match_date) <= limitDate
   })
 
-  // Próximos: más de 24hrs
-  const proximosMatches = matches.filter(m => {
-    if (!m.match_date) return false
-    const status = getStatus(m)
-    return status === 'proximo' && new Date(m.match_date) > new Date(now.getTime() + 24 * 60 * 60 * 1000)
-  })
-
-  // Historial: finalizados
   const historialMatches = matches.filter(m => getStatus(m) === 'finalizado').reverse()
+
+  const groupedByDay = {}
+  votarMatches.forEach(m => {
+    const label = getDayLabel(m.match_date)
+    if (!groupedByDay[label]) groupedByDay[label] = []
+    groupedByDay[label].push(m)
+  })
+
+  const pendientesCount = votarMatches.filter(m => !picks[m.id] && getStatus(m) === 'proximo').length
 
   if (loading) return <div style={{ color: '#8899bb', padding: '40px', textAlign: 'center' }}>Cargando...</div>
 
@@ -117,7 +140,6 @@ export default function ClientHome() {
 
   return (
     <div>
-      {/* Confirmation modal */}
       {confirm && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
@@ -143,7 +165,6 @@ export default function ClientHome() {
         </div>
       )}
 
-      {/* Score card */}
       <div className="card" style={{
         marginBottom: '20px', textAlign: 'center',
         background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)'
@@ -154,21 +175,17 @@ export default function ClientHome() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {tabBtn('votar', '🟢 Para votar', votarMatches.length)}
-        {tabBtn('proximos', '📅 Próximos', proximosMatches.length)}
+        {tabBtn('votar', '⚽ Mis juegos', pendientesCount)}
         {tabBtn('historial', '📋 Historial', historialMatches.length)}
       </div>
 
-      {/* Para votar */}
       {tab === 'votar' && (
         <div>
           {votarMatches.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8899bb' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
-              <p>No hay partidos disponibles para votar ahorita.</p>
-              <p style={{ fontSize: '13px', marginTop: '8px' }}>Revisa la pestaña de Próximos.</p>
+              <p>No hay partidos disponibles por ahora.</p>
             </div>
           ) : (
             <>
@@ -182,51 +199,30 @@ export default function ClientHome() {
                   <strong>Elige muy bien tu resultado.</strong> Una vez que confirmes, no podrás cambiarlo.
                 </p>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {votarMatches.map(m => (
-                  <MatchCard key={m.id} match={m} pick={picks[m.id]}
-                    saving={saving === m.id} onPick={requestPick} status={getStatus(m)} />
-                ))}
-              </div>
+
+              {Object.entries(groupedByDay).map(([dayLabel, dayMatches]) => (
+                <div key={dayLabel} style={{ marginBottom: '24px' }}>
+                  <div style={{
+                    fontSize: '13px', fontWeight: 700, color: '#8899bb',
+                    marginBottom: '10px', padding: '6px 12px',
+                    background: '#1a2235', borderRadius: '8px',
+                    display: 'inline-block'
+                  }}>
+                    {dayLabel}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {dayMatches.map(m => (
+                      <MatchCard key={m.id} match={m} pick={picks[m.id]}
+                        saving={saving === m.id} onPick={requestPick} status={getStatus(m)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </>
           )}
         </div>
       )}
 
-      {/* Próximos */}
-      {tab === 'proximos' && (
-        <div>
-          {proximosMatches.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8899bb' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
-              <p>No hay partidos próximos por ahora.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {proximosMatches.map(m => (
-                <div key={m.id} className="card" style={{ padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
-                      {m.stage}{m.group_name ? ` · Grupo ${m.group_name}` : ''}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 600 }}>
-                      🟢 {formatDate(m.match_date)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.home_team}</span>
-                    <span style={{ color: '#4a5a7a', fontSize: '13px' }}>VS</span>
-                    <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.away_team}</span>
-                  </div>
-                  {m.venue && <p style={{ fontSize: '11px', color: '#4a5a7a', marginTop: '6px' }}>📍 {m.venue}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Historial */}
       {tab === 'historial' && (
         <div>
           {historialMatches.length === 0 ? (
@@ -240,8 +236,9 @@ export default function ClientHome() {
                 const pick = picks[m.id]
                 const isCorrect = pick?.is_correct === true
                 const isWrong = pick?.is_correct === false
-                const pickLabel = pick?.pick === 'home' ? m.home_team : pick?.pick === 'away' ? m.away_team : pick?.pick === 'draw' ? 'Empate' : null
-
+                const pickLabel = pick?.pick === 'home' ? m.home_team
+                  : pick?.pick === 'away' ? m.away_team
+                  : pick?.pick === 'draw' ? 'Empate' : null
                 return (
                   <div key={m.id} className="card" style={{
                     padding: '16px',
