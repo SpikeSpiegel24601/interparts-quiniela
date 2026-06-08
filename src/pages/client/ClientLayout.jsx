@@ -54,7 +54,7 @@ export default function ClientLayout() {
         {/* Right: nav + salir */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <NavLink to="/cliente" end style={linkStyle}>⚽ Juegos</NavLink>
-          <NavLink to="/cliente/ranking" style={linkStyle}>🏆</NavLink>
+          <NavLink to="/cliente/ranking" style={linkStyle}>🏆 Ranking</NavLink>
           <button onClick={logout} style={{
             background: 'none', border: '1px solid #2a3a55', color: '#8899bb',
             borderRadius: '8px', padding: '6px 10px', fontSize: '12px', cursor: 'pointer'
