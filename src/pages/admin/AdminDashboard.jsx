@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [resetConfirm, setResetConfirm] = useState(null)
   const [adminPass, setAdminPass] = useState('')
   const [resetMsg, setResetMsg] = useState('')
+  const [detailTab, setDetailTab] = useState('picks') // picks | info
 
   useEffect(() => { loadData() }, [])
 
@@ -39,6 +40,16 @@ export default function AdminDashboard() {
     setLoadingPicks(true)
     setClientPicks([])
     setResetMsg('')
+    setDetailTab('picks')
+
+    // Cargar datos completos del cliente
+    const { data: fullClient } = await supabase
+      .from('clients')
+      .select('*, sellers(name)')
+      .eq('id', client.id)
+      .single()
+
+    if (fullClient) setSelected(fullClient)
 
     const { data } = await supabase
       .from('picks')
@@ -58,7 +69,8 @@ export default function AdminDashboard() {
   }
 
   async function resetPick() {
-    if (adminPass.toUpperCase() !== import.meta.env.VITE_ADMIN_PASSWORD?.toUpperCase()) {
+    if (adminPass.toUpperCase() !== import.meta.env.VITE_ADMIN_PASSWORD?.toUpperCase() &&
+        adminPass.toUpperCase() !== import.meta.env.VITE_ADMIN_PASSWORD_2?.toUpperCase()) {
       setResetMsg('❌ Contraseña incorrecta')
       return
     }
@@ -98,6 +110,13 @@ export default function AdminDashboard() {
     </div>
   )
 
+  const infoRow = (label, value) => (
+    <div style={{ display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid #1a2235' }}>
+      <span style={{ fontSize: '12px', color: '#8899bb', minWidth: '140px', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: '13px', color: value ? '#f0f4ff' : '#4a5a7a' }}>{value || '—'}</span>
+    </div>
+  )
+
   return (
     <div>
       {/* Reset confirmation modal */}
@@ -110,7 +129,7 @@ export default function AdminDashboard() {
           <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
             <h3 style={{ fontSize: '22px', marginBottom: '12px' }}>⚠️ ¿Estás seguro?</h3>
             <p style={{ color: '#8899bb', fontSize: '14px', marginBottom: '8px', lineHeight: 1.5 }}>
-              Vas a resetear el pick de <strong style={{ color: '#f0f4ff' }}>{selected?.name}</strong> en el partido:
+              Vas a resetear el pick de <strong style={{ color: '#f0f4ff' }}>{selected?.name}</strong> en:
             </p>
             <p style={{ color: '#ffd700', fontSize: '14px', marginBottom: '16px', fontWeight: 600 }}>
               {resetConfirm.matches?.home_team} vs {resetConfirm.matches?.away_team}
@@ -120,7 +139,7 @@ export default function AdminDashboard() {
             </p>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '12px', color: '#8899bb', marginBottom: '6px', display: 'block' }}>
-                Ingresa tu contraseña de admin para confirmar:
+                Ingresa tu contraseña de admin:
               </label>
               <input type="password" value={adminPass}
                 onChange={e => setAdminPass(e.target.value)}
@@ -153,7 +172,7 @@ export default function AdminDashboard() {
         <div className="card">
           <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>TABLA DE POSICIONES</h2>
           <p style={{ color: '#8899bb', fontSize: '12px', marginBottom: '16px' }}>
-            Click en un cliente para ver sus picks
+            Click en un cliente para ver sus detalles
           </p>
           {loading ? (
             <p style={{ color: '#8899bb' }}>Cargando...</p>
@@ -201,7 +220,7 @@ export default function AdminDashboard() {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '22px', marginBottom: '4px' }}>{selected.name}</h2>
+                <h2 style={{ fontSize: '20px', marginBottom: '4px' }}>{selected.nombre_participante || selected.name}</h2>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {typeBadge(selected.client_type)}
                   <span style={{ fontFamily: 'monospace', color: '#e8281e', fontSize: '12px' }}>{selected.code}</span>
@@ -211,85 +230,115 @@ export default function AdminDashboard() {
                 style={{ padding: '4px 10px', fontSize: '12px' }}>✕</button>
             </div>
 
-            {/* Info sobre qué picks se pueden resetear */}
-            <div style={{
-              background: '#1a1a2a', border: '1px solid #2a3a55',
-              borderRadius: '8px', padding: '10px 12px', marginBottom: '16px'
-            }}>
-              <p style={{ fontSize: '11px', color: '#8899bb', margin: 0 }}>
-                🗑️ Solo se pueden resetear picks de partidos <strong style={{ color: '#22c55e' }}>Próximos</strong>. No se pueden resetear picks de partidos <strong style={{ color: '#eab308' }}>En Curso</strong> o <strong style={{ color: '#ef4444' }}>Finalizados</strong>.
-              </p>
+            {/* Sub tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              {['picks', 'info'].map(t => (
+                <button key={t} onClick={() => setDetailTab(t)}
+                  style={{
+                    padding: '6px 16px', borderRadius: '8px', fontSize: '13px',
+                    fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: detailTab === t ? '#e8281e' : '#1a2235',
+                    color: detailTab === t ? 'white' : '#8899bb'
+                  }}>
+                  {t === 'picks' ? '🎯 Sus picks' : '📋 Datos'}
+                </button>
+              ))}
             </div>
 
-            {resetMsg && !resetConfirm && (
-              <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px',
-                background: '#22c55e22', border: '1px solid #22c55e' }}>
-                <p style={{ color: '#22c55e', fontSize: '13px' }}>{resetMsg}</p>
-              </div>
-            )}
+            {/* Picks tab */}
+            {detailTab === 'picks' && (
+              <>
+                <div style={{
+                  background: '#1a1a2a', border: '1px solid #2a3a55',
+                  borderRadius: '8px', padding: '10px 12px', marginBottom: '12px'
+                }}>
+                  <p style={{ fontSize: '11px', color: '#8899bb', margin: 0 }}>
+                    🗑️ Solo se pueden resetear picks de partidos <strong style={{ color: '#22c55e' }}>Próximos</strong>.
+                  </p>
+                </div>
 
-            {loadingPicks ? (
-              <p style={{ color: '#8899bb' }}>Cargando picks...</p>
-            ) : clientPicks.length === 0 ? (
-              <p style={{ color: '#8899bb' }}>Este cliente no ha hecho picks aún.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {clientPicks.map(p => {
-                  const m = p.matches
-                  const matchStatus = getMatchStatus(m)
-                  const isCorrect = p.is_correct === true
-                  const isWrong = p.is_correct === false
-                  const canReset = matchStatus === 'proximo'
+                {resetMsg && !resetConfirm && (
+                  <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px',
+                    background: '#22c55e22', border: '1px solid #22c55e' }}>
+                    <p style={{ color: '#22c55e', fontSize: '13px' }}>{resetMsg}</p>
+                  </div>
+                )}
 
-                  return (
-                    <div key={p.id} style={{
-                      padding: '12px', borderRadius: '8px', background: '#0a0f1e',
-                      border: `1px solid ${isCorrect ? '#22c55e44' : isWrong ? '#ef444444' : '#2a3a55'}`
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>
-                            {m?.home_team} vs {m?.away_team}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#8899bb', marginBottom: '6px' }}>
-                            {m?.stage} · {formatDate(m?.match_date)}
-                            {' · '}
-                            <span style={{
-                              color: matchStatus === 'proximo' ? '#22c55e' : matchStatus === 'en_curso' ? '#eab308' : '#ef4444',
-                              fontWeight: 600
-                            }}>
-                              {matchStatus === 'proximo' ? '🟢 Próximo' : matchStatus === 'en_curso' ? '🟡 En Curso' : '🔴 Finalizado'}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{
-                              padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
-                              background: '#e8281e22', color: '#e8281e'
-                            }}>
-                              Eligió: {pickLabel(p.pick, m)}
-                            </span>
-                            {isCorrect && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓ +10 pts</span>}
-                            {isWrong && <span style={{ color: '#ef4444', fontSize: '12px' }}>✗ 0 pts</span>}
-                            {p.is_correct === null && <span style={{ color: '#8899bb', fontSize: '12px' }}>⏳ Pendiente</span>}
+                {loadingPicks ? (
+                  <p style={{ color: '#8899bb' }}>Cargando picks...</p>
+                ) : clientPicks.length === 0 ? (
+                  <p style={{ color: '#8899bb' }}>Este cliente no ha hecho picks aún.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {clientPicks.map(p => {
+                      const m = p.matches
+                      const matchStatus = getMatchStatus(m)
+                      const isCorrect = p.is_correct === true
+                      const isWrong = p.is_correct === false
+                      const canReset = matchStatus === 'proximo'
+                      return (
+                        <div key={p.id} style={{
+                          padding: '12px', borderRadius: '8px', background: '#0a0f1e',
+                          border: `1px solid ${isCorrect ? '#22c55e44' : isWrong ? '#ef444444' : '#2a3a55'}`
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>
+                                {m?.home_team} vs {m?.away_team}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#8899bb', marginBottom: '6px' }}>
+                                {m?.stage} · {formatDate(m?.match_date)}
+                                {' · '}
+                                <span style={{
+                                  color: matchStatus === 'proximo' ? '#22c55e' : matchStatus === 'en_curso' ? '#eab308' : '#ef4444',
+                                  fontWeight: 600
+                                }}>
+                                  {matchStatus === 'proximo' ? '🟢' : matchStatus === 'en_curso' ? '🟡' : '🔴'}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{
+                                  padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                                  background: '#e8281e22', color: '#e8281e'
+                                }}>
+                                  {pickLabel(p.pick, m)}
+                                </span>
+                                {isCorrect && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓ +10 pts</span>}
+                                {isWrong && <span style={{ color: '#ef4444', fontSize: '12px' }}>✗ 0 pts</span>}
+                                {p.is_correct === null && <span style={{ color: '#8899bb', fontSize: '12px' }}>⏳</span>}
+                              </div>
+                            </div>
+                            {canReset ? (
+                              <button onClick={() => { setResetConfirm(p); setResetMsg('') }}
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 10px', fontSize: '12px', color: '#ef4444', flexShrink: 0 }}>
+                                🗑️
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: '#4a5a7a', flexShrink: 0, paddingLeft: '8px' }}>🔒</span>
+                            )}
                           </div>
                         </div>
-                        {canReset ? (
-                          <button
-                            onClick={() => { setResetConfirm(p); setResetMsg('') }}
-                            className="btn btn-ghost"
-                            style={{ padding: '6px 10px', fontSize: '12px', color: '#ef4444', flexShrink: 0 }}
-                            title="Resetear pick">
-                            🗑️
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: '#4a5a7a', flexShrink: 0, paddingLeft: '8px' }}>
-                            🔒
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Info tab */}
+            {detailTab === 'info' && (
+              <div>
+                {infoRow('Nombre participante', selected.nombre_participante)}
+                {infoRow('Razón social', selected.razon_social)}
+                {infoRow('Nombre público', selected.nombre_publico)}
+                {infoRow('No. CONTPAQ', selected.contpaq_id)}
+                {infoRow('Folio de nota', selected.folio_nota)}
+                {infoRow('Teléfono', selected.phone)}
+                {infoRow('Email', selected.email)}
+                {infoRow('Vendedor', selected.sellers?.name)}
+                {infoRow('Código de acceso', selected.code)}
+                {infoRow('Registrado', selected.is_registered ? '✅ Sí' : '❌ No')}
               </div>
             )}
           </div>
