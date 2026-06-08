@@ -20,13 +20,16 @@ export default function AdminMatches() {
   const [editing, setEditing] = useState(null)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
+  const [diasVisibles, setDiasVisibles] = useState(7)
+  const [diasMsg, setDiasMsg] = useState('')
 
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
-    const [{ data: m }, { data: a }] = await Promise.all([
+    const [{ data: m }, { data: a }, { data: config }] = await Promise.all([
       supabase.from('matches').select('*').order('match_number'),
-      supabase.from('match_assignments').select('*')
+      supabase.from('match_assignments').select('*'),
+      supabase.from('config').select('value').eq('key', 'dias_visibles').single()
     ])
     setMatches(m || [])
     const map = {}
@@ -35,6 +38,16 @@ export default function AdminMatches() {
       map[r.match_id].push(r.client_type)
     })
     setAssignments(map)
+    if (config) setDiasVisibles(parseInt(config.value))
+  }
+
+  async function saveDias() {
+    const { error } = await supabase.from('config')
+      .update({ value: String(diasVisibles) })
+      .eq('key', 'dias_visibles')
+    if (error) setDiasMsg('❌ Error al guardar')
+    else setDiasMsg('✅ Guardado')
+    setTimeout(() => setDiasMsg(''), 2000)
   }
 
   async function saveMatch(e) {
@@ -142,6 +155,29 @@ export default function AdminMatches() {
         {editing ? 'EDITAR PARTIDO' : 'NUEVO PARTIDO'}
       </h1>
       <p style={{ color: '#8899bb', marginBottom: '24px' }}>Carga partidos, resultados y asigna quién puede verlos</p>
+
+      {/* Control días visibles */}
+      <div className="card" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
+            📅 Días visibles para el cliente
+          </div>
+          <div style={{ fontSize: '12px', color: '#8899bb' }}>
+            Cuántos días hacia adelante pueden ver y votar los clientes
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+          <input type="number" min="1" max="60" value={diasVisibles}
+            onChange={e => setDiasVisibles(parseInt(e.target.value))}
+            style={{ width: '80px', textAlign: 'center', fontSize: '18px', fontFamily: 'Bebas Neue' }} />
+          <span style={{ color: '#8899bb', fontSize: '13px' }}>días</span>
+          <button className="btn btn-primary" onClick={saveDias}
+            style={{ padding: '8px 16px', fontSize: '13px' }}>
+            Guardar
+          </button>
+          {diasMsg && <span style={{ fontSize: '13px', color: diasMsg.includes('✅') ? '#22c55e' : '#ef4444' }}>{diasMsg}</span>}
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: '32px' }}>
         <form onSubmit={saveMatch}>
