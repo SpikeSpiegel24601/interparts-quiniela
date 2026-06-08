@@ -33,12 +33,8 @@ export default function AdminClients() {
   }
 
   function handleSort(col) {
-    if (sortCol === col) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortCol(col)
-      setSortDir('asc')
-    }
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
   }
 
   function sortedClients() {
@@ -47,8 +43,11 @@ export default function AdminClients() {
       if (sortCol === 'type') { valA = a.client_type || ''; valB = b.client_type || '' }
       else if (sortCol === 'contpaq') { valA = a.contpaq_id || ''; valB = b.contpaq_id || '' }
       else if (sortCol === 'code') { valA = a.code || ''; valB = b.code || '' }
-      else if (sortCol === 'name') { valA = a.name || ''; valB = b.name || '' }
+      else if (sortCol === 'name') { valA = a.nombre_participante || a.name || ''; valB = b.nombre_participante || b.name || '' }
+      else if (sortCol === 'razon') { valA = a.razon_social || ''; valB = b.razon_social || '' }
       else if (sortCol === 'phone') { valA = a.phone || ''; valB = b.phone || '' }
+      else if (sortCol === 'email') { valA = a.email || ''; valB = b.email || '' }
+      else if (sortCol === 'folio') { valA = a.folio_nota || ''; valB = b.folio_nota || '' }
       else if (sortCol === 'seller') { valA = a.sellers?.name || ''; valB = b.sellers?.name || '' }
       else { valA = ''; valB = '' }
       if (valA < valB) return sortDir === 'asc' ? -1 : 1
@@ -201,8 +200,11 @@ export default function AdminClients() {
                     <th style={thStyle('type')} onClick={() => handleSort('type')}>Tipo{sortIcon('type')}</th>
                     <th style={thStyle('contpaq')} onClick={() => handleSort('contpaq')}>No. CONTPAQ{sortIcon('contpaq')}</th>
                     <th style={thStyle('code')} onClick={() => handleSort('code')}>Código{sortIcon('code')}</th>
-                    <th style={thStyle('name')} onClick={() => handleSort('name')}>Nombre{sortIcon('name')}</th>
+                    <th style={thStyle('name')} onClick={() => handleSort('name')}>Participante{sortIcon('name')}</th>
+                    <th style={thStyle('razon')} onClick={() => handleSort('razon')}>Razón Social{sortIcon('razon')}</th>
+                    <th style={thStyle('folio')} onClick={() => handleSort('folio')}>Folio{sortIcon('folio')}</th>
                     <th style={thStyle('phone')} onClick={() => handleSort('phone')}>Teléfono{sortIcon('phone')}</th>
+                    <th style={thStyle('email')} onClick={() => handleSort('email')}>Email{sortIcon('email')}</th>
                     <th style={thStyle('seller')} onClick={() => handleSort('seller')}>Vendedor{sortIcon('seller')}</th>
                     <th style={{ padding: '10px 12px' }}></th>
                   </tr>
@@ -213,8 +215,11 @@ export default function AdminClients() {
                       <td style={{ padding: '12px' }}>{typeBadge(c.client_type)}</td>
                       <td style={{ padding: '12px', color: '#8899bb', fontFamily: 'monospace' }}>{c.contpaq_id || '—'}</td>
                       <td style={{ padding: '12px', fontFamily: 'monospace', color: '#e8281e', fontWeight: 700 }}>{c.code}</td>
-                      <td style={{ padding: '12px', fontWeight: 500 }}>{c.name}</td>
+                      <td style={{ padding: '12px', fontWeight: 500 }}>{c.nombre_participante || c.name}</td>
+                      <td style={{ padding: '12px', color: '#8899bb', fontSize: '12px' }}>{c.razon_social || '—'}</td>
+                      <td style={{ padding: '12px', color: '#8899bb' }}>{c.folio_nota || '—'}</td>
                       <td style={{ padding: '12px', color: '#8899bb' }}>{c.phone || '—'}</td>
+                      <td style={{ padding: '12px', color: '#8899bb', fontSize: '12px' }}>{c.email || '—'}</td>
                       <td style={{ padding: '12px', color: '#8899bb' }}>{c.sellers?.name || '—'}</td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: '6px' }}>
