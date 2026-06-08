@@ -11,24 +11,21 @@ export default function ClientHome() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const [tab, setTab] = useState('votar')
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const clientType = client.client_type || 'standard'
-
     const { data: assignData } = await supabase
-      .from('match_assignments')
-      .select('match_id')
+      .from('match_assignments').select('match_id')
       .in('client_type', [clientType, 'all'])
-
     const assignedIds = (assignData || []).map(a => a.match_id)
 
     let matchData = []
     if (assignedIds.length > 0) {
       const { data } = await supabase
-        .from('matches')
-        .select('*')
+        .from('matches').select('*')
         .in('id', assignedIds)
         .order('match_date', { ascending: true, nullsFirst: false })
         .order('match_number')
@@ -78,19 +75,49 @@ export default function ClientHome() {
   }
 
   const now = new Date()
-  const availableMatches = matches.filter(m => {
+
+  // Para votar: próximos dentro de las próximas 24hrs o sin fecha, que no estén bloqueados
+  const votarMatches = matches.filter(m => {
+    const status = getStatus(m)
+    if (status === 'finalizado') return false
+    if (status === 'en_curso') return true // mostrar en curso también
     if (!m.match_date) return true
     return new Date(m.match_date) <= new Date(now.getTime() + 24 * 60 * 60 * 1000)
   })
-  const upcomingMatches = matches.filter(m => {
+
+  // Próximos: más de 24hrs
+  const proximosMatches = matches.filter(m => {
     if (!m.match_date) return false
-    return new Date(m.match_date) > new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    const status = getStatus(m)
+    return status === 'proximo' && new Date(m.match_date) > new Date(now.getTime() + 24 * 60 * 60 * 1000)
   })
+
+  // Historial: finalizados
+  const historialMatches = matches.filter(m => getStatus(m) === 'finalizado').reverse()
 
   if (loading) return <div style={{ color: '#8899bb', padding: '40px', textAlign: 'center' }}>Cargando...</div>
 
+  const tabBtn = (key, label, count) => (
+    <button onClick={() => setTab(key)} style={{
+      flex: 1, padding: '10px 8px', borderRadius: '8px', fontSize: '13px',
+      fontWeight: 600, cursor: 'pointer', border: 'none',
+      background: tab === key ? '#e8281e' : '#1a2235',
+      color: tab === key ? 'white' : '#8899bb',
+      transition: 'all 0.15s'
+    }}>
+      {label}
+      {count > 0 && (
+        <span style={{
+          marginLeft: '6px', background: tab === key ? 'rgba(255,255,255,0.3)' : '#2a3a55',
+          borderRadius: '20px', padding: '1px 7px', fontSize: '11px'
+        }}>{count}</span>
+      )}
+    </button>
+  )
+
   return (
     <div>
+      {/* Confirmation modal */}
       {confirm && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
@@ -116,53 +143,145 @@ export default function ClientHome() {
         </div>
       )}
 
+      {/* Score card */}
       <div className="card" style={{
-        marginBottom: '24px', textAlign: 'center',
+        marginBottom: '20px', textAlign: 'center',
         background: 'linear-gradient(135deg, #1a2235 0%, #1a0808 100%)'
       }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: '72px', color: '#e8281e', lineHeight: 1 }}>{points}</div>
-        <div style={{ color: '#8899bb', fontSize: '15px' }}>
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: '64px', color: '#e8281e', lineHeight: 1 }}>{points}</div>
+        <div style={{ color: '#8899bb', fontSize: '14px' }}>
           puntos acumulados · {totalPicks} partidos jugados
         </div>
       </div>
 
-      {availableMatches.length > 0 && (
-        <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ fontSize: '28px', marginBottom: '12px', color: '#f0f4ff' }}>MIS JUEGOS</h2>
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: '10px',
-            background: '#2a1a00', border: '1px solid #f59e0b',
-            borderRadius: '10px', padding: '12px 16px', marginBottom: '16px'
-          }}>
-            <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
-            <p style={{ fontSize: '13px', color: '#fcd34d', lineHeight: 1.5, margin: 0 }}>
-              <strong>Elige muy bien tu resultado.</strong> Una vez que selecciones tu predicción, no podrás editarla ni cambiarla. ¡Piénsalo bien antes de confirmar!
-            </p>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {availableMatches.map(m => (
-              <MatchCard key={m.id} match={m} pick={picks[m.id]}
-                saving={saving === m.id} onPick={requestPick}
-                status={getStatus(m)} />
-            ))}
-          </div>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {tabBtn('votar', '🟢 Para votar', votarMatches.length)}
+        {tabBtn('proximos', '📅 Próximos', proximosMatches.length)}
+        {tabBtn('historial', '📋 Historial', historialMatches.length)}
+      </div>
+
+      {/* Para votar */}
+      {tab === 'votar' && (
+        <div>
+          {votarMatches.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8899bb' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
+              <p>No hay partidos disponibles para votar ahorita.</p>
+              <p style={{ fontSize: '13px', marginTop: '8px' }}>Revisa la pestaña de Próximos.</p>
+            </div>
+          ) : (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px',
+                background: '#2a1a00', border: '1px solid #f59e0b',
+                borderRadius: '10px', padding: '12px 16px', marginBottom: '16px'
+              }}>
+                <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
+                <p style={{ fontSize: '13px', color: '#fcd34d', lineHeight: 1.5, margin: 0 }}>
+                  <strong>Elige muy bien tu resultado.</strong> Una vez que confirmes, no podrás cambiarlo.
+                </p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {votarMatches.map(m => (
+                  <MatchCard key={m.id} match={m} pick={picks[m.id]}
+                    saving={saving === m.id} onPick={requestPick} status={getStatus(m)} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {upcomingMatches.length > 0 && (
+      {/* Próximos */}
+      {tab === 'proximos' && (
         <div>
-          <h2 style={{ fontSize: '24px', marginBottom: '16px', color: '#8899bb' }}>PRÓXIMOS PARTIDOS</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {upcomingMatches.slice(0, 5).map(m => (
-              <div key={m.id} className="card" style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                opacity: 0.6, padding: '14px 16px'
-              }}>
-                <span style={{ fontWeight: 500 }}>{m.home_team} vs {m.away_team}</span>
-                <span style={{ fontSize: '12px', color: '#8899bb' }}>{formatDate(m.match_date)}</span>
-              </div>
-            ))}
-          </div>
+          {proximosMatches.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8899bb' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
+              <p>No hay partidos próximos por ahora.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {proximosMatches.map(m => (
+                <div key={m.id} className="card" style={{ padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
+                      {m.stage}{m.group_name ? ` · Grupo ${m.group_name}` : ''}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 600 }}>
+                      🟢 {formatDate(m.match_date)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.home_team}</span>
+                    <span style={{ color: '#4a5a7a', fontSize: '13px' }}>VS</span>
+                    <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.away_team}</span>
+                  </div>
+                  {m.venue && <p style={{ fontSize: '11px', color: '#4a5a7a', marginTop: '6px' }}>📍 {m.venue}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historial */}
+      {tab === 'historial' && (
+        <div>
+          {historialMatches.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8899bb' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+              <p>Aún no hay partidos finalizados.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {historialMatches.map(m => {
+                const pick = picks[m.id]
+                const isCorrect = pick?.is_correct === true
+                const isWrong = pick?.is_correct === false
+                const pickLabel = pick?.pick === 'home' ? m.home_team : pick?.pick === 'away' ? m.away_team : pick?.pick === 'draw' ? 'Empate' : null
+
+                return (
+                  <div key={m.id} className="card" style={{
+                    padding: '16px',
+                    borderColor: isCorrect ? '#22c55e44' : isWrong ? '#ef444444' : '#2a3a55'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span className="badge" style={{ background: '#2a3a55', color: '#8899bb', fontSize: '11px' }}>
+                        {m.stage}{m.group_name ? ` · Grupo ${m.group_name}` : ''}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#8899bb' }}>{formatDate(m.match_date)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.home_team}</span>
+                      <span style={{ fontFamily: 'Bebas Neue', fontSize: '24px', color: '#ffd700', padding: '0 12px' }}>
+                        {m.home_score} — {m.away_score}
+                      </span>
+                      <span style={{ fontWeight: 700, fontSize: '16px' }}>{m.away_team}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {pickLabel ? (
+                        <>
+                          <span style={{
+                            padding: '3px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                            background: isCorrect ? '#22c55e22' : isWrong ? '#ef444422' : '#2a3a55',
+                            color: isCorrect ? '#22c55e' : isWrong ? '#ef4444' : '#8899bb'
+                          }}>
+                            Elegiste: {pickLabel}
+                          </span>
+                          {isCorrect && <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: 700 }}>✓ +10 pts</span>}
+                          {isWrong && <span style={{ color: '#ef4444', fontSize: '13px' }}>✗ 0 pts</span>}
+                        </>
+                      ) : (
+                        <span style={{ color: '#4a5a7a', fontSize: '12px' }}>No participaste en este partido</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
