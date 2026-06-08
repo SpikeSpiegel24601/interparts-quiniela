@@ -18,6 +18,8 @@ export default function AdminClients() {
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState('list')
   const [editing, setEditing] = useState(null)
+  const [sortCol, setSortCol] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => { loadAll() }, [])
 
@@ -28,6 +30,31 @@ export default function AdminClients() {
     ])
     setClients(c || [])
     setSellers(s || [])
+  }
+
+  function handleSort(col) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
+
+  function sortedClients() {
+    return [...clients].sort((a, b) => {
+      let valA, valB
+      if (sortCol === 'type') { valA = a.client_type || ''; valB = b.client_type || '' }
+      else if (sortCol === 'contpaq') { valA = a.contpaq_id || ''; valB = b.contpaq_id || '' }
+      else if (sortCol === 'code') { valA = a.code || ''; valB = b.code || '' }
+      else if (sortCol === 'name') { valA = a.name || ''; valB = b.name || '' }
+      else if (sortCol === 'phone') { valA = a.phone || ''; valB = b.phone || '' }
+      else if (sortCol === 'seller') { valA = a.sellers?.name || ''; valB = b.sellers?.name || '' }
+      else { valA = ''; valB = '' }
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
   }
 
   async function addClient(e) {
@@ -134,6 +161,15 @@ export default function AdminClients() {
     </span>
   )
 
+  const thStyle = (col) => ({
+    padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
+    color: sortCol === col ? '#f0f4ff' : '#8899bb',
+    fontSize: '12px', fontWeight: 600, userSelect: 'none',
+    whiteSpace: 'nowrap'
+  })
+
+  const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+
   return (
     <div>
       <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>CLIENTES</h1>
@@ -162,14 +198,17 @@ export default function AdminClients() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #2a3a55' }}>
-                    {['Tipo', 'No. CONTPAQ', 'Código', 'Nombre', 'Teléfono', 'Vendedor', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left',
-                        color: '#8899bb', fontSize: '12px', fontWeight: 600 }}>{h}</th>
-                    ))}
+                    <th style={thStyle('type')} onClick={() => handleSort('type')}>Tipo{sortIcon('type')}</th>
+                    <th style={thStyle('contpaq')} onClick={() => handleSort('contpaq')}>No. CONTPAQ{sortIcon('contpaq')}</th>
+                    <th style={thStyle('code')} onClick={() => handleSort('code')}>Código{sortIcon('code')}</th>
+                    <th style={thStyle('name')} onClick={() => handleSort('name')}>Nombre{sortIcon('name')}</th>
+                    <th style={thStyle('phone')} onClick={() => handleSort('phone')}>Teléfono{sortIcon('phone')}</th>
+                    <th style={thStyle('seller')} onClick={() => handleSort('seller')}>Vendedor{sortIcon('seller')}</th>
+                    <th style={{ padding: '10px 12px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clients.map(c => (
+                  {sortedClients().map(c => (
                     <tr key={c.id} style={{ borderBottom: '1px solid #1a2235' }}>
                       <td style={{ padding: '12px' }}>{typeBadge(c.client_type)}</td>
                       <td style={{ padding: '12px', color: '#8899bb', fontFamily: 'monospace' }}>{c.contpaq_id || '—'}</td>
